@@ -234,3 +234,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 [release-badge]: https://img.shields.io/github/v/release/omphteliba/ha-speidel-braumeister
 [license]: LICENSE
 [license-badge]: https://img.shields.io/github/license/omphteliba/ha-speidel-braumeister
+
+## Optional dashboard
+
+A native display card with telemetry and optional smart-plug controls is available in [dashboard/](dashboard/README.md). Installation is manual; configure your own entity IDs.

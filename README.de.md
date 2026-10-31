@@ -224,3 +224,7 @@ Danke an die gesamte Home Assistant Community für die Unterstützung und Inspir
 [release]: https://github.com/omphteliba/ha-speidel-braumeister/releases
 [license-badge]: https://img.shields.io/github/license/omphteliba/ha-speidel-braumeister?style=for-the-badge
 [license]: LICENSE
+
+## Optionales Dashboard
+
+Eine native Display-Karte mit Telemetrie und optionaler Zwischenstecker-Steuerung liegt unter [dashboard/](dashboard/README.md). Die Installation erfolgt manuell; die eigenen Entitäts-IDs werden in der Karten-YAML eingetragen.
