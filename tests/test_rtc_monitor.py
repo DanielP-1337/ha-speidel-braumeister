@@ -235,3 +235,31 @@ async def test_beta_real_xhr_parser_reaches_rtc_monitor():
             result = await obj._async_update_data()
         assert result['rtc_offset'] == 3
         assert result['rtc_warning'] is False
+
+
+@pytest.mark.parametrize("code,clock_text,flags,target,elapsed", [
+    (101, '11:25', 'ph', None, None),
+    (2810, '11:26', 'PH', 1200, 1004),
+    (101, 'invalid', '??', None, None),
+])
+async def test_xhr_display_attributes_reach_card_sensor(code, clock_text, flags, target, elapsed):
+    from test_adaptive_polling import web, payload
+    module, obj = coordinator()
+    obj._fetch_bridge = AsyncMock(return_value=None)
+    raw = payload(code, indicators=flags).split(';')
+    raw[2] = '100000'
+    fields = raw[3].split('X')
+    fields[1] = clock_text
+    raw[3] = 'X'.join(fields)
+    parsed = web.SpeidelWebAuth('', '')._parse_xhr_response(';'.join(raw))
+    obj.web_auth = SimpleNamespace(get_device_status=AsyncMock(return_value=parsed))
+    result = await obj._async_update_data()
+    assert result['display_clock'] == (clock_text if clock_text != 'invalid' else None)
+    assert result['display_pump_flag'] == (flags[0] if flags != '??' else None)
+    assert result['display_heater_flag'] == (flags[1] if flags != '??' else None)
+    assert result['display_time_target_seconds'] == target
+    assert result['display_time_elapsed_seconds'] == elapsed
+    assert result['rtc_offset'] is None  # Clock display is independent of RTC baseline.
+    obj.web_auth.get_device_status.return_value = None
+    offline = await obj._async_update_data()
+    assert offline.get('display_clock') is None

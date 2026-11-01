@@ -307,6 +307,8 @@ class SpeidelBraumeisterDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     result['data_source'] = 'xhr'
                     result['device_timestamp'] = xhr_data.get('device_timestamp')
                     result['time_display'] = xhr_data.get('time_display')
+                    result.update({key: value for key, value in xhr_data.items()
+                                   if key.startswith("display_")})
                     result['temperature'] = xhr_data.get('temperature')
                     result['target_temperature'] = xhr_data.get('target_temperature')
                     result['remaining_time'] = xhr_data.get('remaining_time')

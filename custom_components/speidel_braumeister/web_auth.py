@@ -5,6 +5,7 @@ This module handles obtaining/maintaining that session AND XHR polling for real-
 """
 
 import logging
+from .brew_display import brew_display
 from time import monotonic
 import re
 from typing import Any, Optional
@@ -502,6 +503,9 @@ class SpeidelWebAuth:
             # Pump/heater indicators are case-sensitive characters at field 14.
             result.update(parse_actuator_status(data_parts))
             result.update(display_flags(data_parts))
+            # Keep the same validated display metadata as the bridge path.
+            result.update({key: value for key, value in brew_display(data_parts).items()
+                           if key.startswith("display_")})
 
             # Process status
             if current_temp is not None:
