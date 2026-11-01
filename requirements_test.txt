@@ -2,3 +2,4 @@ aiohttp
 aiodns
 pytest
 pytest-asyncio
+tzdata

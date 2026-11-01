@@ -435,6 +435,10 @@ class SpeidelWebAuth:
             result['firmware'] = parts[0]
             result['device_uuid'] = parts[1]
             result['session_id'] = parts[2]
+            try:
+                result['device_timestamp'] = int(parts[2])
+            except ValueError:
+                result['device_timestamp'] = None
             
             encoded = parts[3]
             data_parts = encoded.split('X')

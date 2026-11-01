@@ -56,6 +56,8 @@ class SpeidelBraumeisterBinarySensor(SpeidelBraumeisterEntity, BinarySensorEntit
     def is_on(self) -> bool | None:
         """Return true if the binary sensor is on."""
         data = self.coordinator.data
+        if self.entity_description.key == "rtc_warning":
+            return data.get("rtc_warning") if data else None
         if not data:
             return False
 

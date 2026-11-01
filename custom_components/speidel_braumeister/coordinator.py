@@ -4,6 +4,9 @@ import logging
 from time import monotonic
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
+from zoneinfo import ZoneInfo
+
+from .rtc_monitor import RTCMonitor
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -61,6 +64,7 @@ class SpeidelBraumeisterDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._last_online: Optional[datetime] = None
         # Store last known good data for device info
         self._last_device_info: dict[str, Any] = {}
+        self._rtc_monitor = RTCMonitor()
 
     @callback
     def update_from_mqtt(self, data: dict[str, Any]) -> None:
@@ -79,6 +83,8 @@ class SpeidelBraumeisterDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         updated_data["connection_status"] = "online"
         updated_data["last_online"] = self._last_online
         self._set_poll_interval(updated_data)
+        self._rtc_monitor.reset()
+        updated_data.update(rtc_offset=None, rtc_warning=None)
         self.async_set_updated_data(updated_data)
 
     def _is_valid_temp(self, temp: Any) -> bool:
@@ -100,7 +106,10 @@ class SpeidelBraumeisterDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _get_offline_result(self) -> dict[str, Any]:
         """Return a default result for offline devices, preserving last online info."""
+        self._rtc_monitor.reset()
         return {
+            "rtc_offset": None,
+            "rtc_warning": None,
             "connection_status": "offline",
             "temperature": None,
             "target_temperature": None,
@@ -130,6 +139,13 @@ class SpeidelBraumeisterDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _clean_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """Clean and validate data, removing invalid/stale values."""
         cleaned = data.copy()
+        if data.get("time_display") and data.get("device_timestamp"):
+            cleaned.update(self._rtc_monitor.observe(
+                data, datetime.now(ZoneInfo(self.hass.config.time_zone)), monotonic()
+            ))
+        else:
+            self._rtc_monitor.reset()
+            cleaned.update(rtc_offset=None, rtc_warning=None)
         
         # Clean temperature values
         temp_valid = self._is_valid_temp(data.get("temperature"))
@@ -288,6 +304,9 @@ class SpeidelBraumeisterDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if xhr_data and xhr_data.get('temperature') is not None:
                     _LOGGER.debug("Got data via XHR polling")
                     
+                    result['data_source'] = 'xhr'
+                    result['device_timestamp'] = xhr_data.get('device_timestamp')
+                    result['time_display'] = xhr_data.get('time_display')
                     result['temperature'] = xhr_data.get('temperature')
                     result['target_temperature'] = xhr_data.get('target_temperature')
                     result['remaining_time'] = xhr_data.get('remaining_time')

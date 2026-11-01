@@ -90,6 +90,9 @@
       },
       "last_online": {
         "name": "Last Online"
+      },
+      "rtc_offset": {
+        "name": "RTC offset"
       }
     },
     "switch": {
@@ -112,6 +115,11 @@
       },
       "next_phase": {
         "name": "Next Phase"
+      }
+    },
+    "binary_sensor": {
+      "rtc_warning": {
+        "name": "Check RTC"
       }
     }
   }
