@@ -160,6 +160,10 @@ async def test_diagnostic_entities_registration_and_unknown_states():
     import sys
     import types
     from conftest import ROOT
+    from enum import StrEnum
+
+    class EntityCategory(StrEnum):
+        DIAGNOSTIC = "diagnostic"
 
     def mod(name, **attrs):
         result = types.ModuleType(name)
@@ -178,6 +182,7 @@ async def test_diagnostic_entities_registration_and_unknown_states():
         'rtc_entities.entity': mod('entity', SpeidelBraumeisterEntity=Entity),
         'homeassistant.config_entries': mod('config', ConfigEntry=object),
         'homeassistant.core': mod('core', HomeAssistant=object),
+        'homeassistant.helpers.entity': mod('entity', EntityCategory=EntityCategory),
         'homeassistant.helpers.entity_platform': mod('platform', AddEntitiesCallback=object),
         'homeassistant.components.sensor': mod('sensor', SensorEntity=type('Sensor', (), {}), SensorEntityDescription=SimpleNamespace),
         'homeassistant.components.binary_sensor': mod('binary', BinarySensorEntity=type('Binary', (), {}), BinarySensorEntityDescription=SimpleNamespace),
@@ -193,7 +198,11 @@ async def test_diagnostic_entities_registration_and_unknown_states():
         await binaries.async_setup_entry(hass, entry, entities.extend)
         offset = next(e for e in entities if e.entity_description.key == 'rtc_offset')
         warning = next(e for e in entities if e.entity_description.key == 'rtc_warning')
-        assert offset.entity_description.entity_category == 'diagnostic'
+        # HA registry requires an enum instance; an equal string is rejected.
+        for entity in (offset, warning):
+            category = entity.entity_description.entity_category
+            assert isinstance(category, EntityCategory)
+            assert category is EntityCategory.DIAGNOSTIC
         assert offset.entity_description.native_unit_of_measurement == 'min'
         assert warning.entity_description.device_class == 'problem'
         assert offset.native_value == 30

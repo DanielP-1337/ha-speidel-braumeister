@@ -5,13 +5,13 @@ function Assert-Exit([string]$Message) {
     if ($LASTEXITCODE -ne 0) { throw $Message }
 }
 
-$tag = '2.0.10-beta'
+$tag = '2.0.11-beta'
 $fork = 'DanielP-1337/ha-speidel-braumeister'
 $forkUrl = "https://github.com/$fork.git"
 $branch = git branch --show-current
 Assert-Exit 'Cannot read branch.'
-if ($branch -notlike 'release/rtc-2.0.10-beta*') {
-    throw 'Run this script on the separate release/rtc-2.0.10-beta branch.'
+if ($branch -notlike 'release/rtc-2.0.11-beta*') {
+    throw 'Run this script on the separate release/rtc-2.0.11-beta branch.'
 }
 $manifest = Get-Content 'custom_components/speidel_braumeister/manifest.json' -Raw | ConvertFrom-Json
 if ($manifest.version -ne $tag) { throw 'Unexpected integration version.' }
@@ -48,13 +48,13 @@ $localTag = git tag --list $tag
 Assert-Exit 'Cannot check local tag.'
 if ($localTag) { throw "$tag already exists locally. Nothing overwritten." }
 
-git tag -a $tag -m '2.0.10-beta - Restore cloud display clock and metadata'
+git tag -a $tag -m '2.0.11-beta - Fix RTC diagnostic entity registration'
 Assert-Exit 'Cannot create tag.'
 git push --atomic $forkUrl "HEAD:refs/heads/$branch" "refs/tags/$tag"
 Assert-Exit 'Push failed; local tag retained for diagnosis.'
 gh release create $tag --repo $fork --verify-tag --prerelease --latest=false `
-    --title '2.0.10-beta - Restore cloud display clock and metadata' `
-    --notes-file 'RELEASE-NOTES-2.0.10-beta.md'
+    --title '2.0.11-beta - Fix RTC diagnostic entity registration' `
+    --notes-file 'RELEASE-NOTES-2.0.11-beta.md'
 Assert-Exit 'Branch/tag pushed, but release creation failed. Do not rerun; inspect the error.'
 gh release view $tag --repo $fork --json tagName,isPrerelease,url
 Assert-Exit 'Cannot read published release.'
