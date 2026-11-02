@@ -4,6 +4,13 @@ Reverse-engineered from a packet capture of a Braumeister talking to the My Spei
 cloud (Fritzbox packet capture, 2026-10-30, ~5.5 minutes, 281 requests).
 Everything marked *hypothesis* is inferred from a single capture and needs confirmation.
 
+Current evidence update (2026-11-02): regular Bridge 0.3.0 and Integration
+2.0.11-beta were verified, followed by the optional local 0.3.1-diag.1 recorder.
+The passive recorder hardware/export test passed; the recorder is now disabled
+and normal forwarding was rechecked. See [the current command experiment
+ledger](COMMAND_RE_EXPERIMENTS.md). Historical command mappings below remain
+hypotheses until individually correlated browser/cloud/device evidence exists.
+
 Device used for the capture:
 
 | Property | Value |
@@ -20,9 +27,9 @@ Device used for the capture:
 - Interval: ~1.2 s on average, up to ~5 s.
 - Request body is URL-encoded (`%20` for spaces, etc.); the first `=` separates the
   message type from the payload.
-- No DNS query was seen during the capture, so it is still open whether the device
-  resolves `api2.myspeidel.com` or uses a hard-coded IP. Capture a device power-cycle
-  to find out — this decides whether a DNS override can redirect it.
+- No DNS query was seen during this initial capture of an already running device.
+  The later power-cycle capture documented below established DNS use; re-resolution
+  behavior after the TTL expires remains unknown.
 
 ## Device → Server
 
@@ -60,7 +67,7 @@ Payload is 19 fields separated by `X`:
 | 6 | `4800`, `1200`, `60`, `0` | **Duration of the current program step in seconds**: rest (`60` for a 1-min rest), boil (`1200` for 20 min). Outside timed steps it keeps the boil time of the selected recipe. Remaining time = field 6 − field 7 during `2820` (rest) and `3070` (boil) |
 | 7 | `0`…`167` | **Seconds since the current state was entered**, resets on state change |
 | 8 | `0`…`5` | *Hypothesis:* number of recipe slots synced. Dropped to 0 after `$d=A`, then counted up by one per `$rz` |
-| 9 | `0`…`4` | **Recipe slot of the running program** (`0` for Weizen, `2` for the test recipe). Briefly `4` after entering manual mode, so only meaningful during a program |
+| 9 | `0`…`4` | **Recipe slot/index, context dependent.** Historical program captures identify the running recipe. The 2026-11-02 list-navigation captures establish highlighted slots 0 → 1 → 0 and 0 → 3 → 0 in screen `2015`, matching physical positions 1 → 2 → 1 and boundary wraparound 1 → 4 → 1 in a four-slot list. Briefly `4` after entering manual mode; do not interpret it as an active program outside that context. Position 3, other list sizes and empty-list behavior remain untested. |
 | 10 | `0`, `5` | Unknown; became `5` at rest end and stayed until the end |
 | 11 | `0`, `-1` | *Hypothesis:* hop addition state; changed from `0` to `-1` at the hop addition 10 min before the end of the boil |
 | 12 | `0`…`318` | Unknown, counts up during a program (about 3 per minute while boiling) |
@@ -146,16 +153,22 @@ OK\r\n
 Done
 ```
 
-There is no signature, so the device appears to accept unsigned commands.
-At most one command per response was observed.
+No response signature was identified in the historical capture. This does not
+establish the absence of validation inside the firmware, or prove that commands
+can be replayed. At most one command per response was observed in that capture.
 
-| Command | Observed effect — *hypotheses* |
-|---|---|
-| `$k=1` | Key press "back": 4006 → 101, 6010 → 101 |
-| `$k=2` | Key press "enter/select": 101 → 4006 (manual mode); inside 4006 it toggled the pump |
-| `$k=4` | Key press: 101 → 6010 |
-| `$d=A` | *Hypothesis:* delete/reset all recipe slots — field 8 dropped to 0 and was followed by `$rz` for all 5 slots |
-| `$rz=<slot line>` | Write one recipe slot, same format as the `rz` lines above. The device reports it back in its next `rz` message |
+| Action hypothesis | Context | Browser request | Device command | Reported subsequent device observation | Evidence confidence |
+|---|---|---|---|---|---|
+| Back key | Screens 4006 / 6010 | Not captured here | `$k=1` | 4006 → 101 / 6010 → 101 | Historical association; full browser-to-device chain unverified |
+| Select key / pump toggle | 101 / manual screen 4006 | Not captured here | `$k=2` | 101 → 4006; pump changed inside 4006 | Context-dependent hypothesis; no explicit on/off semantics established |
+| Menu key | Screen 101 | Not captured here | `$k=4` | 101 → 6010 | Historical association; screen meaning incomplete |
+| Delete/reset recipe slots | Recipe synchronization | Not captured here | `$d=A` | Field 8 fell to 0, then five `$rz` replies | Hypothesis; no isolated delete experiment |
+| Write recipe slot | Recipe synchronization | Not captured here | `$rz=<slot line>` | Following `rz` message reported the slot | Historical report; browser mapping and delivery rules unverified |
+
+These rows summarize the existing documentation, not new hardware validation.
+The original raw capture is not present in this checkout. Do not promote a row
+to a confirmed mapping merely because an HTTP request succeeded or a status
+arrived soon afterwards. No new device commands were sent during this analysis.
 
 What a `$k` key press does depends on the screen the device currently shows (field 3).
 
@@ -163,12 +176,13 @@ What a `$k` key press does depends on the screen the device currently shows (fie
 
 - Device ↔ cloud traffic is **plain HTTP**: status, recipes and commands can be read by anyone
   on the network path.
-- Server responses carry **no signature**. Whoever can answer the device's requests instead of
-  the real server (DNS spoofing, ARP spoofing, a compromised router) can send it commands,
-  including key presses that start a program or switch on the heater.
-- The signature on the device's own messages does not protect the device, because the device
-  never checks anything coming back.
-- Only Speidel can fix this (TLS with certificate validation, signed responses).
+- No signature was identified in the captured server response bodies. An attacker
+  able to replace plain HTTP responses could attempt command injection; firmware
+  validation, replay restrictions and execution conditions have not been established.
+- A signature on outbound telemetry alone would not authenticate incoming
+  responses. Whether there are additional checks is unknown.
+- Authenticated transport or authenticated responses would address response
+  integrity; this analysis does not modify or probe firmware validation.
 
 ## Relation to the web interface XHR string
 
@@ -190,8 +204,8 @@ body `Start\r\n[$command\r\n]OK\r\nDone\r\n`.
 
 ## Local integration path
 
-Because the protocol is plain HTTP with unsigned server responses, Home Assistant can
-take the cloud's place:
+Because the protocol uses plain HTTP, a local bridge can receive and relay the
+device's requests:
 
 1. Redirect `api2.myspeidel.com` to a local endpoint (DNS override; the device uses DNS, see below).
 2. Answer `POST /braumeister/connect` with `Start\r\nOK\r\nDone` and parse `bm_stat`/`rz`.
@@ -269,8 +283,173 @@ has a subscription and one Braumeister of the generation described above.
 
 ## Open questions
 
-- Does the device resolve the hostname via DNS or use a hard-coded IP?
-- Meaning of fields 0, 6, 9–12, 15–18 and of more state codes (rests, boil, hop alarms, end).
-  This needs a capture of a full brew.
+- DNS use is documented above from firmware strings and a historical power-cycle
+  capture; verify the currently deployed routing separately with fresh traffic.
+- Remaining unknown fields and state codes: use the field tables above. Several
+  older open questions (including field 6) have already been resolved there.
 - Full `$k` key mapping, and the meaning of `$d=A`.
 - Behaviour during an alarm (e.g. hop addition, "add malt pipe").
+
+## Observation workflow and evidence boundaries
+
+Code audit baseline: upstream `01ac674f4cb35fa04e05708de52b944aebeeadc7`
+(2026-11-01). PRs [13](https://github.com/omphteliba/ha-speidel-braumeister/pull/13),
+[16](https://github.com/omphteliba/ha-speidel-braumeister/pull/16) and
+[17](https://github.com/omphteliba/ha-speidel-braumeister/pull/17) were merged;
+[15](https://github.com/omphteliba/ha-speidel-braumeister/pull/15) was open at audit.
+That audit did not establish the installed live state. Subsequent user-assisted
+inventory, deployment and passive capture have now established it as summarized
+above and in the experiment ledger. An integration version is not a bridge version.
+
+The audited bridge routes the configured Host to `handle_device`, reads and
+records its application body, then forwards the same body/method/path/query to
+the cloud when enabled. It requests identity encoding and decodes supported
+compressed cloud replies before writing the answer to the device. A received
+HTTP error is relayed; forwarding/read/decompression failures use a local OK
+answer. Other Host values follow the separate passthrough path. This is a code
+finding, not proof of the current network route.
+
+Current ordinary logging records message types/device identifiers, selected
+state changes, `$` command lines and (at debug level) at most 200 response bytes.
+`/api/status` keeps the latest payload per message type and the latest response,
+not a transaction history. The optional capture described in
+[the bridge guide](../braumeister_bridge/DOCS.md#optional-local-diagnostic-capture)
+adds full body evidence and per-request correlation without originating commands.
+
+### Manual prerequisites and baseline evidence
+
+Before any deployment, collect the bridge app's installed version, whether it is
+local or repository-installed, active options with secrets removed, and startup
+plus fresh traffic logs. If source files are visible over an existing share,
+record their SHA-256 and `config.yaml` version too, but do not assume that shared
+source equals the running container image. Do not install tools, change settings
+or restart HA/the app just to collect this evidence.
+
+The owner confirmed completion of the RTC test using integration 2.0.11-beta,
+**2026-11-01 23:55 through 2026-11-02 00:05 Europe/Berlin** (22:55–23:05 UTC).
+Owner-reported result: OK continuously from 23:55:21 across midnight; 0–1 minute
+offset, no day-change jump or false alarm. After switch-off: unknown at 00:05:10,
+unavailable at 00:08:01. The owner reports results/screenshots published in PR 15;
+these screenshots were not independently re-inspected here. The waiting phase
+has ended, but **deployment approval has not been given**. Installation, option
+changes and HA/bridge restarts still require agreement on the concrete target,
+steps, interruption and rollback. No recorder hardware test has been established
+by the successful RTC test.
+
+Using an already available local HA-host shell, sample only the local API:
+
+```sh
+date -u '+%Y-%m-%dT%H:%M:%SZ'
+curl --fail --silent --show-error http://127.0.0.1:8642/api/health
+curl --fail --silent --show-error http://127.0.0.1:8642/api/status
+```
+
+Repeat the two API reads manually after approximately 5–10 seconds. This is a
+read of bridge memory, not an additional cloud/device poll. Do not expose the
+API or change its binding. In a terminal app/container, `127.0.0.1` may refer to
+that container rather than the HA host: a connection failure there does not
+prove the bridge is down. Use existing host access or supply logs instead.
+
+Keep originals private. In copies, replace device IDs, addresses and signatures
+consistently; remove private recipe content. Preserve receipt times, server
+`now`, status fields and `last_response_source`. Increasing fresh
+`bm_stat_received` demonstrates device requests reaching the bridge. Together
+with corresponding fresh forwarding logs and `last_response_source: cloud`, it
+supports that this bridge processed a cloud reply. The last source alone has
+no independent response timestamp in the old API. Neither that source nor portal
+reachability proves delivery or device execution. DNS configuration alone also
+does not prove the device used that route.
+
+### Chrome recording (manual only)
+
+1. Sign in yourself. Open DevTools (F12), Network, enable **Preserve log** and
+   verify recording is active. Start with Fetch/XHR; if an action has no entry,
+   select All and inspect document/other requests and WebSocket messages.
+2. Record a 60-second baseline without any portal/device action. Do not change
+   polling settings. Separate periodic status reads from action-triggered traffic.
+3. For each agreed navigation action, note the exact click time, current portal
+   screen and physical display, then perform exactly one action yourself.
+   Capture URL/path, method, payload, response status/body and Timing. For a
+   WebSocket, record the relevant outgoing/incoming messages and their times.
+4. Export the relevant HAR with content, or copy the individual request as cURL
+   **for inspection only**. Never execute the copied cURL. HAR sanitization by
+   Chrome alone is insufficient: URL/query, payload and response bodies can
+   contain tokens, identifiers and recipes. Remove Cookie, Set-Cookie,
+   Authorization, account data, tokens in all locations and private recipes
+   before sharing. Keep field structure/byte lengths noted when redacting.
+5. Preserve bridge timestamps in UTC. On Windows, record
+   `[DateTimeOffset]::Now.ToString('o')`, `Get-TimeZone` and `w32tm /query /status`
+   in PowerShell (read only). Record HA's configured timezone and UTC host time
+   with the local samples. Note Windows/HA NTP synchronization state; browser
+   request timing alone does not measure host clock error. If possible record
+   Windows UTC immediately before/after an HA-host UTC read to bound clock
+   offset by that measurement's round-trip interval. Do not adjust either clock
+   during an observation window. Device RTC is a separate clock, not capture time.
+
+### Initial experiment matrix
+
+The bridge-only B00 hardware/export baseline is complete (see the ledger);
+browser-side capture and cross-host clock bounds were not collected in it.
+Navigation/repetition rows below remain **planned, not performed**. Navigation can be state-dependent;
+agree the named control and starting screen before clicking. Do not treat an
+unknown portal button as safe based on a guessed `$k` number.
+
+**B00 is the first live experiment, after deployment is separately approved and
+the installed route/backup/export prerequisites are evidenced.** Before its
+start, the owner signs in manually and prepares DevTools. Do not request or
+read credentials, cookies or browser sessions; no automated login or portal
+operation is part of this work. Document screen, program state and P/H flags
+before T0. Capture the unchanged existing polling for exactly 60 seconds with
+no portal/device operation, then record the physical state again at T1. Do not
+assume a passive interval contains no spontaneously queued cloud command.
+
+Record T0/T1 in UTC and Europe/Berlin (UTC+01:00 on this date), each host's clock
+source and an uncertainty interval for their offset. Use HAR wall-clock start
+times plus request durations for browser evidence; use bridge UTC, session,
+sequence, correlation IDs and monotonic durations for device exchanges. Cross-
+host monotonic values cannot be compared. An apparent match inside overlapping
+time uncertainty is a candidate association, not proof. Flag gaps, torn lines,
+eviction, incomplete reads and missing end markers before drawing conclusions.
+Keep originals private and share only manually sanitized copies. Schedule N01
+only after B00 is assessed, and agree that single action separately.
+
+| ID | Starting state | One action | Duration/repetition | Purpose |
+|---|---|---|---|---|
+| B00 | Stable idle/display documented | None | 60 seconds | Polling baseline, spontaneous messages, clock correlation |
+| N01 | Agreed idle main menu, no active program | One agreed menu/navigation control | Observe next status reports for at least 15 seconds | First browser → cloud → bridge → display association |
+| N02 | N01 destination documented | One agreed Back/navigation control | Observe at least 15 seconds | Context-dependent navigation; no actuator controls |
+| R01 | Same starting state as N01 restored by the user | Repeat precisely N01 once | Separate attempt ID; 15 seconds observation | Identify changing IDs, counters/times and stable command bytes |
+| R02 | Same starting state as N02 | Repeat precisely N02 once | Separate attempt ID; 15 seconds observation | Repeatability and state dependence |
+
+For every attempt fill the following record; blanks mean unknown, not absent:
+
+```text
+attempt_id:
+action_utc / Europe_Berlin / clock_offset_bound:
+portal_screen_before / device_screen_before / program_and_actuator_state:
+exact_single_action / click_time_precision:
+browser_request_id / method / path / sanitized_payload:
+browser_status / sanitized_response / websocket_messages_if_any:
+bridge_session / correlation_id / cloud_status / raw_command_bytes:
+response_source / decompression / response_write_result:
+following_status_receipt_times / relevant_status_fields:
+physical_display_or_actuator_observation / observation_time_precision:
+capture_gaps_or_retention_or_missing_records:
+observation / hypothesis / confirmed_mapping / counterevidence:
+open_questions / confidence_and_reason:
+```
+
+Pump, heater, program start/abort and recipe save/delete are excluded from this
+initial matrix. The owner performs such actions only after explicit agreement.
+No automated click sequences, replay or production-cloud fuzzing.
+
+### Conditions before future HA control
+
+Require independently repeated, context-specific browser/device mappings and
+physical confirmation; distinguish toggle/key semantics from explicit on/off.
+Determine parameter syntax/encoding, command ordering in multiline responses,
+retries, acknowledgements, duplicates, loss/error behavior and any sequence,
+signature or expiry checks. Unknown fields remain unknown. Assess safe state
+preconditions and recovery separately. The current patch adds no control API,
+automatic replay or extra cloud polling. Its synthetic tests establish capture
+and forwarding behavior only, not real command meanings.
