@@ -2,5 +2,12 @@
 CLAUDE.md
 *.log
 captures/
+private/
+diagnostics/
+*.har
+*.pcap
+*.pcapng
+*.jsonl
+.venv/
 __pycache__/
 *.pyc

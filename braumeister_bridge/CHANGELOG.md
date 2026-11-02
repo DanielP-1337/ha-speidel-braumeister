@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1-diag.1 (local preparation, not an upstream release)
+
+- Optional bounded private recorder for the verified 0.3.0 app baseline; disabled
+  by default. No new polls, commands, replay, download route or integration update.
+- Fault-isolated preparation/writing, binary-safe correlated events, explicit
+  gaps, bounded queue/retention, owner-only POSIX files and uncertain-tail markers.
+- Handle SIGTERM through the existing cleanup so normal container stop can write
+  a session-end record; forced termination remains an uncertain tail.
+- Local differential, ARM64 emulation and synthetic persistent-data export tests.
+  See the preparation plan before any deployment or recording.
+
 ## 0.3.0
 
 - Cloud lookups reject private/local answers, so a network-wide DNS rewrite (e.g. AdGuard

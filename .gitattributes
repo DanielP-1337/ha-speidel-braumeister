@@ -1,0 +1,2 @@
+# Preserve the exact upstream source bytes used by the baseline SHA256 test.
+tests/fixtures/bridge_030.py text eol=lf

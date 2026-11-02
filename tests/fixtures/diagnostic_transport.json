@@ -1,0 +1,17 @@
+{
+  "provenance": "Entirely synthetic. No captured identifiers, credentials, recipes or verified command meanings.",
+  "cases": [
+    {
+      "name": "future_multiline_preserves_order",
+      "request_latin1": "unknown=\u0000\u00ff\r\nline2\r\n ",
+      "cloud_status": 200,
+      "response_latin1": "Start\r\n$unknown=one\r\n$unknown=two\r\n\u0000\u00ff\r\nOK\r\nDone\r\n"
+    },
+    {
+      "name": "empty_cloud_error_is_not_local_ok",
+      "request_latin1": "",
+      "cloud_status": 503,
+      "response_latin1": ""
+    }
+  ]
+}

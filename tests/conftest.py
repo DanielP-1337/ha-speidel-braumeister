@@ -31,6 +31,7 @@ sys.modules[package.__name__] = package
 device_protocol = _load(
     "protocol_tests.device_protocol", ROOT / "custom_components" / "speidel_braumeister" / "device_protocol.py"
 )
+_load("bridge_diagnostics", ROOT / "braumeister_bridge" / "app" / "bridge_diagnostics.py")
 bridge = _load("bridge", ROOT / "braumeister_bridge" / "app" / "bridge.py")
 
 

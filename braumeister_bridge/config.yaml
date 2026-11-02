@@ -1,5 +1,5 @@
 name: Braumeister Bridge
-version: "0.3.0"
+version: "0.3.1-diag.1"
 slug: braumeister_bridge
 description: Receives the Speidel Braumeister's cloud traffic locally (DNS + port 80) for the Speidel Braumeister integration
 url: https://github.com/omphteliba/ha-speidel-braumeister
@@ -20,6 +20,9 @@ options:
   passthrough_url: ""
   api_port: 8642
   log_level: info
+  diagnostics_enabled: false
+  diagnostics_max_file_mb: 8
+  diagnostics_files: 4
 schema:
   bridge_ip: str?
   cloud_host: str
@@ -32,3 +35,6 @@ schema:
   passthrough_url: str?
   api_port: port
   log_level: list(debug|info|warning|error)
+  diagnostics_enabled: bool
+  diagnostics_max_file_mb: int(1,64)
+  diagnostics_files: int(2,10)

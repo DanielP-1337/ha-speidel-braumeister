@@ -23,9 +23,11 @@ import zlib
 import json
 import logging
 import os
+import signal
 import socket
 import struct
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote_plus
@@ -35,6 +37,14 @@ from aiohttp.abc import AbstractResolver
 from aiohttp.resolver import DefaultResolver
 
 _LOGGER = logging.getLogger("braumeister_bridge")
+try:
+    from bridge_diagnostics import Capture, protocol_headers
+    # New aiohttp versions provide typed keys; older app images use strings.
+    _CAPTURE_KEY = web.RequestKey("bridge_capture", tuple) if hasattr(web, "RequestKey") else "bridge_capture"
+    _DECOMPRESSED_KEY = web.RequestKey("bridge_cloud_decompressed", bool) if hasattr(web, "RequestKey") else "bridge_cloud_decompressed"
+except Exception:
+    # An optional recorder import/key failure must not prevent normal startup.
+    Capture = protocol_headers = None
 
 OPTIONS_FILE = Path(os.environ.get("BRIDGE_OPTIONS", "/data/options.json"))
 DEFAULTS: dict[str, Any] = {
@@ -53,6 +63,9 @@ DEFAULTS: dict[str, Any] = {
     "cloud_url": "",
     # Recipe lists are kept here so they survive restarts (empty = do not store)
     "state_file": "/data/recipes.json",
+    "diagnostics_enabled": False,
+    "diagnostics_max_file_mb": 8,
+    "diagnostics_files": 4,
 }
 
 LOCAL_ANSWER = b"Start\r\nOK\r\nDone\r\n"
@@ -187,6 +200,10 @@ class Bridge:
         self.session: ClientSession | None = None
         self.cloud_session: ClientSession | None = None
         self.cloud_resolver = None
+        self.capture: Capture | None = None
+        self.capture_start_failed = False
+        self.capture_failures = 0
+        self.capture_shutdown_failed = False
         self.state_file = Path(options["state_file"]) if options.get("state_file") else None
         self.load_recipes()
 
@@ -224,6 +241,15 @@ class Bridge:
                 timeout=ClientTimeout(total=8), auto_decompress=False,
             )
         self.session = ClientSession(timeout=ClientTimeout(total=8), auto_decompress=False)
+        if self.options.get("diagnostics_enabled"):
+            try:
+                self.capture = Capture(
+                    Path(self.options.get("diagnostics_directory", "/data/diagnostics")),
+                    max_bytes=int(self.options.get("diagnostics_max_file_mb", 8)) * 1024 * 1024,
+                    files=int(self.options.get("diagnostics_files", 4)),
+                )
+            except Exception:
+                self.capture_start_failed = True
 
     async def close_session(self, _app: web.Application | None = None) -> None:
         if self.cloud_session:
@@ -232,6 +258,28 @@ class Bridge:
             await self.cloud_resolver.close()
         if self.session:
             await self.session.close()
+        if self.capture:
+            try:
+                await asyncio.wait_for(self.capture.close(), timeout=1.25)
+            except Exception:
+                self.capture_shutdown_failed = True
+
+    def capture_event(self, request, event, details=None):
+        """Include preparation in the fault boundary; never log on this path."""
+        if self.capture:
+            try:
+                if event == "request_started":
+                    request[_CAPTURE_KEY] = (uuid.uuid4().hex, time.monotonic_ns())
+                data = details() if details else {}
+                if event == "cloud_decoded":
+                    request[_DECOMPRESSED_KEY] = data["decompressed"]
+                self.capture.emit(request.get(_CAPTURE_KEY), event, **data)
+            except Exception:
+                self.capture_failures += 1
+                try:
+                    self.capture.emit(None, "diagnostic_event_error", failed_event=event)
+                except Exception:
+                    pass
 
     # -- port 80 ------------------------------------------------------------
 
@@ -244,7 +292,13 @@ class Bridge:
         return web.Response(status=404, text="Not found")
 
     async def handle_device(self, request: web.Request) -> web.StreamResponse:
-        body = await request.read()
+        self.capture_event(request, "request_started", lambda: dict(method=request.method, path=request.path, query_omitted=bool(request.query_string), headers=protocol_headers(request.headers)))
+        try:
+            body = await request.read()
+        except BaseException as err:
+            self.capture_event(request, "request_read_error", lambda err=err: dict(error_type=type(err).__name__, complete=False, body_available=False, missing="aiohttp read failed; partial body unavailable"))
+            raise
+        self.capture_event(request, "request_body", lambda: dict(body=body, complete=True, representation="aiohttp_server_application_body", decompressed=request.headers.get("Content-Encoding", "identity").lower() not in ("", "identity")))
         self.record(request.path, body, request.remote)
 
         status, headers, answer, source = 200, {"Content-Type": "text/plain; charset=UTF-8"}, LOCAL_ANSWER, "local"
@@ -255,6 +309,10 @@ class Bridge:
                 source = "cloud"
             except Exception as err:  # cloud down or unreachable: answer locally
                 _LOGGER.warning("Cloud forward failed (%s), answering locally", err)
+                self.capture_event(request, "cloud_error", lambda err=err: dict(error_type=type(err).__name__, fallback="local", cloud_duration_ns=int((time.monotonic() - started) * 1e9)))
+            except asyncio.CancelledError:
+                self.capture_event(request, "cloud_cancelled", lambda: dict(complete=False))
+                raise
             _LOGGER.debug(
                 "%s %s -> %s %s in %.0f ms: %r",
                 request.method, request.path, source, status,
@@ -273,9 +331,15 @@ class Bridge:
         response = web.StreamResponse(status=status, headers=headers)
         response.enable_chunked_encoding()  # the real server answers chunked
         response.force_close()
-        await response.prepare(request)
-        await response.write(answer)
-        await response.write_eof()
+        self.capture_event(request, "response_ready", lambda: dict(status=status, source=source, body=answer, complete=True, headers=protocol_headers(headers), representation="device_response_application_body", decompressed=source == "cloud" and request.get(_DECOMPRESSED_KEY, False)))
+        try:
+            await response.prepare(request)
+            await response.write(answer)
+            await response.write_eof()
+        except BaseException as err:
+            self.capture_event(request, "response_write_error", lambda err=err: dict(status=status, source=source, error_type=type(err).__name__, device_execution="unconfirmed", bytes_delivered="unknown"))
+            raise
+        self.capture_event(request, "response_write_complete", lambda: dict(status=status, source=source, device_execution="unconfirmed", meaning="HTTP writer completed; no device acknowledgement"))
         return response
 
     async def forward_to_cloud(self, request: web.Request, body: bytes) -> tuple[int, dict[str, str], bytes]:
@@ -287,10 +351,17 @@ class Bridge:
         # The device cannot decode compressed answers and never asks for them, but
         # aiohttp would add "Accept-Encoding: gzip" on its own. Ask for plain text.
         headers["Accept-Encoding"] = "identity"
+        self.capture_event(request, "cloud_request_started", lambda: dict(method=request.method, path=request.path, source="cloud", headers=protocol_headers(headers)))
         async with (self.cloud_session or self.session).request(
             request.method, url, data=body, headers=headers, allow_redirects=False
         ) as resp:
-            answer = await resp.read()
+            self.capture_event(request, "cloud_response_started", lambda: dict(status=resp.status, headers=protocol_headers(resp.headers), source="cloud"))
+            try:
+                answer = await resp.read()
+            except BaseException as err:
+                self.capture_event(request, "cloud_response_read_error", lambda err=err: dict(status=resp.status, error_type=type(err).__name__, complete=False, body_available=False, missing="aiohttp read failed; partial body unavailable"))
+                raise
+            self.capture_event(request, "cloud_response_body", lambda: dict(status=resp.status, body=answer, headers=protocol_headers(resp.headers), complete=True, decompressed=False, representation="http_entity_after_transfer_decoding", source="cloud"))
             encoding = resp.headers.get("Content-Encoding", "").strip().lower()
             if encoding in ("gzip", "x-gzip"):
                 answer = gzip.decompress(answer)  # compressed anyway: unpack for the device
@@ -301,6 +372,7 @@ class Bridge:
                     answer = zlib.decompress(answer, -zlib.MAX_WBITS)
             elif encoding not in ("", "identity"):
                 raise ValueError("Unsupported cloud content encoding")
+            self.capture_event(request, "cloud_decoded", lambda: dict(decompressed=encoding not in ("", "identity")))
             out = {"Content-Type": resp.headers.get("Content-Type", "text/plain; charset=UTF-8")}
             return resp.status, out, answer
 
@@ -397,7 +469,15 @@ class Bridge:
         return web.json_response({"now": time.time(), "devices": devices})
 
     async def api_health(self, _request: web.Request) -> web.Response:
-        return web.json_response({"ok": True, "devices": len(self.devices)})
+        health = {"ok": True, "devices": len(self.devices)}
+        if self.capture:
+            try:
+                health["diagnostics"] = {**self.capture.status(), "event_errors": self.capture_failures}
+            except Exception:
+                health["diagnostics"] = {"status_failed": True, "event_errors": self.capture_failures}
+        elif self.capture_start_failed:
+            health["diagnostics"] = {"startup_failed": True, "writer_alive": False}
+        return web.json_response(health)
 
 
 def build_apps(bridge: Bridge) -> tuple[web.Application, web.Application]:
@@ -442,9 +522,20 @@ async def main() -> None:
                  options["http_port"], options["passthrough_url"] or "off",
                  options["api_host"], options["api_port"])
 
+    shutdown = asyncio.Event()
+    term_handler_installed = False
     try:
-        await asyncio.Event().wait()
+        # Docker/Supervisor stop uses SIGTERM. asyncio.run only installs a
+        # SIGINT handler; without this the recorder cannot finish its session.
+        try:
+            loop.add_signal_handler(signal.SIGTERM, shutdown.set)
+            term_handler_installed = True
+        except (NotImplementedError, RuntimeError):
+            pass  # Windows event loops still support normal task cancellation.
+        await shutdown.wait()
     finally:
+        if term_handler_installed:
+            loop.remove_signal_handler(signal.SIGTERM)
         for runner in runners:
             await runner.cleanup()
         await bridge.close_session()
