@@ -97,6 +97,14 @@ With `control_enabled: true`, local API clients can POST JSON containing
 | `open_recipe_list` / `close_recipe_list` | 101 ↔ 6010 |
 | `open_recipe_selection` / `cancel_recipe_selection` | 101 ↔ 2015 |
 | `recipe_down` / `recipe_up` | 2015, change highlighted slot |
+| `pump_on` / `pump_off` | 4006, `ph → Ph` / `Ph → ph`, requires `manual_pump_enabled` |
+| `heater_on` / `heater_off` | 4006, `ph → pH` / `pH → ph`, requires `allow_remote_heating` |
+
+Both actuator options default to false and also require `control_enabled`.
+The manual-mode keys toggle their respective actuator. This beta accepts
+only the tested single-actuator transitions. Use the heating option only
+for supervised tests below the setpoint and stop heating at the device.
+The meaning of the heater flag during temperature regulation remains unverified.
 
 List navigation requires a known four-slot recipe list. Confirmation checks
 the expected highlighted slot, including wraparound.

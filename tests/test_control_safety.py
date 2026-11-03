@@ -20,8 +20,9 @@ async def test_local_control_through_device_poll(bridge_module):
         bridge, device, api = await make_bridge(bridge_module, str(cloud.make_url("")))
         async with device, api:
             try:
-                async def poll(state, slot=0):
-                    body = BM_STAT.replace(b"X2820X", f"X{state}X".encode()).replace(b"XPiX", b"XphX")
+                async def poll(state, slot=0, flags="ph"):
+                    body = BM_STAT.replace(b"X2820X", f"X{state}X".encode())
+                    body = body.replace(b"XPiX", f"X{flags}X".encode())
                     fields = body.split(b"X")
                     fields[9] = str(slot).encode()
                     body = b"X".join(fields)
@@ -91,6 +92,35 @@ async def test_local_control_through_device_poll(bridge_module):
                     assert await poll(2015, before) == ack
                     assert await result() == "sent"
                     assert await poll(2015, after) == ack
+                    assert await result() == "confirmed"
+                assert await poll(4006) == ack
+                assert (await enqueue("pump_on")).status == 403
+                bridge.options["manual_pump_enabled"] = True
+                assert (await enqueue("pump_off")).status == 409
+                for action, before, after in (
+                    ("pump_on", "ph", "Ph"),
+                    ("pump_off", "Ph", "ph"),
+                ):
+                    assert (await enqueue(action)).status == 202
+                    assert await poll(4006, flags=before) == b"Start\r\n$k=2\r\nOK\r\nDone\r\n"
+                    assert await poll(4006, flags=before) == ack
+                    assert await result() == "sent"
+                    assert await poll(4006, flags=after) == ack
+                    assert await result() == "confirmed"
+                assert (await enqueue("heater_on")).status == 403
+                bridge.options["allow_remote_heating"] = True
+                assert await poll(4006, flags="Ph") == ack
+                assert (await enqueue("heater_on")).status == 409
+                assert await poll(4006) == ack
+                for action, before, after in (
+                    ("heater_on", "ph", "pH"),
+                    ("heater_off", "pH", "ph"),
+                ):
+                    assert (await enqueue(action)).status == 202
+                    assert await poll(4006, flags=before) == b"Start\r\n$k=3\r\nOK\r\nDone\r\n"
+                    assert await poll(4006, flags=before) == ack
+                    assert await result() == "sent"
+                    assert await poll(4006, flags=after) == ack
                     assert await result() == "confirmed"
             finally:
                 await bridge.close_session()

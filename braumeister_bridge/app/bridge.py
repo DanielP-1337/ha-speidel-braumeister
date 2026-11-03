@@ -50,6 +50,8 @@ DEFAULTS: dict[str, Any] = {
     "api_host": "127.0.0.1",
     "log_level": "info",
     "control_enabled": False,
+    "manual_pump_enabled": False,
+    "allow_remote_heating": False,
     # Where device requests are forwarded; empty = http://<cloud_host> (for tests)
     "cloud_url": "",
     # Recipe lists are kept here so they survive restarts (empty = do not store)
@@ -63,12 +65,28 @@ LOCAL_ACTIONS = {
     "close_settings": ("8101", "101", b"$k=1"),
     "open_manual": ("101", "4006", b"$k=2"),
     "close_manual": ("4006", "101", b"$k=1"),
+    "pump_on": ("4006", "4006", b"$k=2"),
+    "pump_off": ("4006", "4006", b"$k=2"),
+    "heater_on": ("4006", "4006", b"$k=3"),
+    "heater_off": ("4006", "4006", b"$k=3"),
     "open_recipe_list": ("101", "6010", b"$k=4"),
     "close_recipe_list": ("6010", "101", b"$k=1"),
     "open_recipe_selection": ("101", "2015", b"$k=3"),
     "cancel_recipe_selection": ("2015", "101", b"$k=1"),
     "recipe_down": ("2015", "2015", b"$k=2"),
     "recipe_up": ("2015", "2015", b"$k=3"),
+}
+ACTUATOR_FLAGS = {
+    "pump_on": ("ph", "Ph"),
+    "pump_off": ("Ph", "ph"),
+    "heater_on": ("ph", "pH"),
+    "heater_off": ("pH", "ph"),
+}
+ACTUATOR_OPTIONS = {
+    "pump_on": "manual_pump_enabled",
+    "pump_off": "manual_pump_enabled",
+    "heater_on": "allow_remote_heating",
+    "heater_off": "allow_remote_heating",
 }
 RECIPE_MOVES = {"recipe_down": 1, "recipe_up": -1}
 HOP_BY_HOP = {
@@ -278,7 +296,9 @@ class Bridge:
             command = None
         if command and command["result"] == "sent":
             screen, flags, slot = self.control_screen(message[1])
-            if (screen, flags) == (LOCAL_ACTIONS[command["action"]][1], "ph") and (
+            action = command["action"]
+            target_flags = ACTUATOR_FLAGS.get(action, ("ph", "ph"))[1]
+            if (screen, flags) == (LOCAL_ACTIONS[action][1], target_flags) and (
                 command["target_slot"] is None or command["target_slot"] == slot
             ):
                 command["result"] = "confirmed"
@@ -302,9 +322,13 @@ class Bridge:
                 and self.options.get("control_enabled") is True
                 and device.get("bm_stat_received") == sample
                 and time.monotonic() - received < CONTROL_TIMEOUT):
-            before, _, key = LOCAL_ACTIONS[command["action"]]
+            action = command["action"]
+            before, _, key = LOCAL_ACTIONS[action]
+            source_flags = ACTUATOR_FLAGS.get(action, ("ph", "ph"))[0]
             screen, flags, slot = self.control_screen(message[1])
-            if (screen, flags) != (before, "ph") or (
+            if action in ACTUATOR_OPTIONS and self.options.get(ACTUATOR_OPTIONS[action]) is not True:
+                command["result"] = "state_changed"
+            elif (screen, flags) != (before, source_flags) or (
                 command["source_slot"] is not None and command["source_slot"] != slot
             ) or (
                 command["target_slot"] is not None and self.recipe_count(device) != 4
@@ -494,7 +518,10 @@ class Bridge:
         screen, flags, slot = self.control_screen(device.get("bm_stat", ""))
         if action not in LOCAL_ACTIONS:
             raise web.HTTPBadRequest(text="Unsupported action")
-        if (screen, flags) != (LOCAL_ACTIONS[action][0], "ph"):
+        if action in ACTUATOR_OPTIONS and self.options.get(ACTUATOR_OPTIONS[action]) is not True:
+            raise web.HTTPForbidden(text="Manual actuator control is disabled")
+        source_flags = ACTUATOR_FLAGS.get(action, ("ph", "ph"))[0]
+        if (screen, flags) != (LOCAL_ACTIONS[action][0], source_flags):
             raise web.HTTPConflict(text="Device screen or actuator state does not match")
         source_slot = target_slot = None
         if action in RECIPE_MOVES:
