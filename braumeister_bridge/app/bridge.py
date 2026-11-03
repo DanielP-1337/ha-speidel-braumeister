@@ -49,6 +49,7 @@ DEFAULTS: dict[str, Any] = {
     "api_port": 8642,
     "api_host": "127.0.0.1",
     "log_level": "info",
+    "control_enabled": False,
     # Where device requests are forwarded; empty = http://<cloud_host> (for tests)
     "cloud_url": "",
     # Recipe lists are kept here so they survive restarts (empty = do not store)
@@ -56,6 +57,20 @@ DEFAULTS: dict[str, Any] = {
 }
 
 LOCAL_ANSWER = b"Start\r\nOK\r\nDone\r\n"
+CONTROL_TIMEOUT = 5
+LOCAL_ACTIONS = {
+    "open_settings": ("101", "8101", b"$k=1"),
+    "close_settings": ("8101", "101", b"$k=1"),
+    "open_manual": ("101", "4006", b"$k=2"),
+    "close_manual": ("4006", "101", b"$k=1"),
+    "open_recipe_list": ("101", "6010", b"$k=4"),
+    "close_recipe_list": ("6010", "101", b"$k=1"),
+    "open_recipe_selection": ("101", "2015", b"$k=3"),
+    "cancel_recipe_selection": ("2015", "101", b"$k=1"),
+    "recipe_down": ("2015", "2015", b"$k=2"),
+    "recipe_up": ("2015", "2015", b"$k=3"),
+}
+RECIPE_MOVES = {"recipe_down": 1, "recipe_up": -1}
 HOP_BY_HOP = {
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
     "te", "trailers", "transfer-encoding", "upgrade", "host", "content-length",
@@ -187,8 +202,15 @@ class Bridge:
         self.session: ClientSession | None = None
         self.cloud_session: ClientSession | None = None
         self.cloud_resolver = None
+        self.local_command: dict[str, Any] | None = None
         self.state_file = Path(options["state_file"]) if options.get("state_file") else None
         self.load_recipes()
+
+    def pending_control(self) -> dict[str, Any] | None:
+        command = self.local_command
+        if command and command["result"] in ("queued", "sent") and time.monotonic() >= command["deadline"]:
+            command["result"] = "expired" if command["result"] == "queued" else "unconfirmed"
+        return command
 
     def load_recipes(self) -> None:
         """Restore the last recipe list (rz) of every device."""
@@ -245,7 +267,21 @@ class Bridge:
 
     async def handle_device(self, request: web.Request) -> web.StreamResponse:
         body = await request.read()
+        received = time.monotonic()
         self.record(request.path, body, request.remote)
+        device = self.device_for(body)
+        sample = device.get("bm_stat_received") if device else None
+        message = self.split_message(body) if self.options.get("control_enabled") is True else None
+        poll = request.method == "POST" and request.path == "/braumeister/connect" and message and message[0] == "bm_stat"
+        command = self.pending_control() if poll and device else None
+        if command and command["device_id"] != device["device_id"]:
+            command = None
+        if command and command["result"] == "sent":
+            screen, flags, slot = self.control_screen(message[1])
+            if (screen, flags) == (LOCAL_ACTIONS[command["action"]][1], "ph") and (
+                command["target_slot"] is None or command["target_slot"] == slot
+            ):
+                command["result"] = "confirmed"
 
         status, headers, answer, source = 200, {"Content-Type": "text/plain; charset=UTF-8"}, LOCAL_ANSWER, "local"
         if self.options["forward_to_cloud"]:
@@ -261,7 +297,24 @@ class Bridge:
                 (time.monotonic() - started) * 1000, answer[:200],
             )
 
-        device = self.device_for(body)
+        sending = None
+        if (command and self.pending_control() is command and command["result"] == "queued"
+                and self.options.get("control_enabled") is True
+                and device.get("bm_stat_received") == sample
+                and time.monotonic() - received < CONTROL_TIMEOUT):
+            before, _, key = LOCAL_ACTIONS[command["action"]]
+            screen, flags, slot = self.control_screen(message[1])
+            if (screen, flags) != (before, "ph") or (
+                command["source_slot"] is not None and command["source_slot"] != slot
+            ) or (
+                command["target_slot"] is not None and self.recipe_count(device) != 4
+            ):
+                command["result"] = "state_changed"
+            elif source == "cloud" and status == 200 and answer == LOCAL_ANSWER:
+                answer = b"Start\r\n" + key + b"\r\nOK\r\nDone\r\n"
+                source = "local_control"
+                command["result"] = "sending"
+                sending = command
         if device:
             device["last_response"] = answer.decode("latin-1", "replace")
             device["last_response_source"] = source
@@ -273,9 +326,16 @@ class Bridge:
         response = web.StreamResponse(status=status, headers=headers)
         response.enable_chunked_encoding()  # the real server answers chunked
         response.force_close()
-        await response.prepare(request)
-        await response.write(answer)
-        await response.write_eof()
+        try:
+            await response.prepare(request)
+            await response.write(answer)
+            await response.write_eof()
+        except BaseException:
+            if sending:
+                sending["result"] = "unconfirmed"
+            raise
+        if sending:
+            sending.update(result="sent", deadline=time.monotonic() + CONTROL_TIMEOUT)
         return response
 
     async def forward_to_cloud(self, request: web.Request, body: bytes) -> tuple[int, dict[str, str], bytes]:
@@ -389,6 +449,70 @@ class Bridge:
 
     # -- local API ----------------------------------------------------------
 
+    @staticmethod
+    def control_screen(payload: str) -> tuple[str, str, str]:
+        parts = payload.split(";", 4)
+        fields = parts[3].split("X", 15) if len(parts) >= 4 else []
+        return (fields[3], fields[14], fields[9]) if len(fields) >= 15 else ("", "", "")
+
+    @staticmethod
+    def recipe_count(device: dict[str, Any]) -> int:
+        lines = device.get("rz", "").splitlines()
+        if len(lines) == 5 and lines[0].split(";")[-1].strip() == "4" and all(
+            line.startswith(f"{index}X") for index, line in enumerate(lines[1:])
+        ):
+            return 4
+        return 0
+
+    async def api_control(self, request: web.Request) -> web.Response:
+        if self.options.get("control_enabled") is not True:
+            raise web.HTTPForbidden(text="Local control is disabled")
+        if request.remote not in ("127.0.0.1", "::1") or "Origin" in request.headers:
+            raise web.HTTPForbidden(text="Local API clients only")
+        if request.method == "GET":
+            command = self.pending_control()
+            return web.json_response({
+                key: command[key] for key in ("device_id", "action", "result")
+            } if command else {})
+        if request.content_type != "application/json":
+            raise web.HTTPUnsupportedMediaType()
+        try:
+            data = json.loads(await request.content.readexactly(request.content_length)) if (
+                request.content_length is not None and 0 < request.content_length <= 1024
+            ) else None
+        except (ValueError, asyncio.IncompleteReadError):
+            raise web.HTTPBadRequest(text="Invalid JSON") from None
+        if not isinstance(data, dict) or set(data) != {"device_id", "action"}:
+            raise web.HTTPBadRequest(text="Expected device_id and action")
+        device_id, action = data["device_id"], data["action"]
+        if not isinstance(device_id, str) or not isinstance(action, str):
+            raise web.HTTPBadRequest(text="Expected string fields")
+        device = self.devices.get(device_id, {})
+        age = time.time() - device.get("bm_stat_received", 0)
+        if not 0 <= age < CONTROL_TIMEOUT:
+            raise web.HTTPConflict(text="Fresh device status required")
+        screen, flags, slot = self.control_screen(device.get("bm_stat", ""))
+        if action not in LOCAL_ACTIONS:
+            raise web.HTTPBadRequest(text="Unsupported action")
+        if (screen, flags) != (LOCAL_ACTIONS[action][0], "ph"):
+            raise web.HTTPConflict(text="Device screen or actuator state does not match")
+        source_slot = target_slot = None
+        if action in RECIPE_MOVES:
+            if self.recipe_count(device) != 4 or slot not in ("0", "1", "2", "3"):
+                raise web.HTTPConflict(text="A known four-slot recipe list and current slot are required")
+            source_slot = slot
+            target_slot = str((int(slot) + RECIPE_MOVES[action]) % 4)
+        command = self.pending_control()
+        if command and command["result"] in ("queued", "sending", "sent"):
+            raise web.HTTPConflict(text="A local command is already pending")
+        now = time.monotonic()
+        self.local_command = {
+            "device_id": device_id, "action": action, "result": "queued",
+            "source_slot": source_slot, "target_slot": target_slot,
+            "deadline": now + CONTROL_TIMEOUT,
+        }
+        return web.json_response({"result": "queued"}, status=202)
+
     async def api_status(self, request: web.Request) -> web.Response:
         device_id = request.query.get("device")
         devices = list(self.devices.values())
@@ -407,6 +531,8 @@ def build_apps(bridge: Bridge) -> tuple[web.Application, web.Application]:
     api = web.Application()
     api.router.add_get("/api/status", bridge.api_status)
     api.router.add_get("/api/health", bridge.api_health)
+    api.router.add_get("/api/control", bridge.api_control)
+    api.router.add_post("/api/control", bridge.api_control)
     return port80, api
 
 
