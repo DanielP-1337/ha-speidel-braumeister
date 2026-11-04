@@ -77,10 +77,10 @@ LOCAL_ACTIONS = {
     "recipe_up": ("2015", "2015", b"$k=3"),
 }
 ACTUATOR_FLAGS = {
-    "pump_on": {"ph": "Ph"},
-    "pump_off": {"Ph": "ph"},
-    "heater_on": {"ph": "pH"},
-    "heater_off": {"pH": "ph", "Pi": "Ph", "pi": "ph"},
+    "pump_on": {"ph": ("Ph",), "pH": ("PH",), "pi": ("Pi",)},
+    "pump_off": {"Ph": ("ph",), "PH": ("pH",), "Pi": ("pi",)},
+    "heater_on": {"ph": ("pH", "pi"), "Ph": ("PH", "Pi")},
+    "heater_off": {"pH": ("ph",), "PH": ("Ph",), "Pi": ("Ph",), "pi": ("ph",)},
 }
 ACTUATOR_OPTIONS = {
     "pump_on": "manual_pump_enabled",
@@ -298,7 +298,7 @@ class Bridge:
             screen, flags, slot = self.control_screen(message[1])
             action = command["action"]
             target_flags = command["target_flags"]
-            if (screen, flags) == (LOCAL_ACTIONS[action][1], target_flags) and (
+            if screen == LOCAL_ACTIONS[action][1] and flags in target_flags and (
                 command["target_slot"] is None or command["target_slot"] == slot
             ):
                 command["result"] = "confirmed"
@@ -520,7 +520,7 @@ class Bridge:
             raise web.HTTPBadRequest(text="Unsupported action")
         if action in ACTUATOR_OPTIONS and self.options.get(ACTUATOR_OPTIONS[action]) is not True:
             raise web.HTTPForbidden(text="Manual actuator control is disabled")
-        target_flags = ACTUATOR_FLAGS.get(action, {"ph": "ph"}).get(flags)
+        target_flags = ACTUATOR_FLAGS.get(action, {"ph": ("ph",)}).get(flags)
         if screen != LOCAL_ACTIONS[action][0] or target_flags is None:
             raise web.HTTPConflict(text="Device screen or actuator state does not match")
         source_slot = target_slot = None

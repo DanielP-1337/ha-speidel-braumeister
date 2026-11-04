@@ -100,7 +100,12 @@ async def test_local_control_through_device_poll(bridge_module):
                 for action, before, after in (
                     ("pump_on", "ph", "Ph"),
                     ("pump_off", "Ph", "ph"),
+                    ("pump_on", "pH", "PH"),
+                    ("pump_off", "PH", "pH"),
+                    ("pump_on", "pi", "Pi"),
+                    ("pump_off", "Pi", "pi"),
                 ):
+                    assert await poll(4006, flags=before) == ack
                     assert (await enqueue(action)).status == 202
                     assert await poll(4006, flags=before) == b"Start\r\n$k=2\r\nOK\r\nDone\r\n"
                     assert await poll(4006, flags=before) == ack
@@ -109,11 +114,14 @@ async def test_local_control_through_device_poll(bridge_module):
                     assert await result() == "confirmed"
                 assert (await enqueue("heater_on")).status == 403
                 bridge.options["allow_remote_heating"] = True
-                assert await poll(4006, flags="Ph") == ack
+                assert await poll(4006, flags="PH") == ack
                 assert (await enqueue("heater_on")).status == 409
                 assert await poll(4006) == ack
                 for action, before, after in (
                     ("heater_on", "ph", "pH"),
+                    ("heater_on", "Ph", "PH"),
+                    ("heater_on", "Ph", "Pi"),
+                    ("heater_off", "PH", "Ph"),
                     ("heater_off", "pH", "ph"),
                     ("heater_off", "Pi", "Ph"),
                     ("heater_off", "pi", "ph"),
@@ -129,6 +137,7 @@ async def test_local_control_through_device_poll(bridge_module):
                 assert (await enqueue("heater_off")).status == 202
                 assert await poll(4006, flags="PH") == ack
                 assert await result() == "state_changed"
+                assert await poll(4006, flags="Ph") == ack
                 assert (await enqueue("heater_off")).status == 409
             finally:
                 await bridge.close_session()
