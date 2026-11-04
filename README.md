@@ -1,5 +1,7 @@
 # Speidel Braumeister Home Assistant Integration for Firmware V1.1.27 Sep 12 2018
 
+**Disclaimer:** This project is an independent open-source development and is not affiliated with, funded by, or endorsed by Speidel Tank- und Behälterbau GmbH or any of its affiliates. "Braumeister" and "MySpeidel" are trademarks of their respective owners.
+
 [![hacs][hacs-badge]][hacs]
 [![GitHub Release][release-badge]][release]
 [![License][license-badge]][license]
