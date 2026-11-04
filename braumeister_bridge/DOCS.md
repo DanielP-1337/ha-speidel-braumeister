@@ -106,6 +106,15 @@ only the tested single-actuator transitions. Use the heating option only
 for supervised tests below the setpoint and stop heating at the device.
 The meaning of the heater flag during temperature regulation remains unverified.
 
+On November 4, 2026, a hardware test of `0.3.2-control.3-beta.1` confirmed
+all four actions through the local Bridge API in manual mode (`4006`).
+The pump was observed starting and stopping with the heater off. On the
+first pump-off attempt, the client-side status check stopped the request
+before submission. The next attempt used a fresh `Ph` status and succeeded.
+With the pump off, at 20 °C measured and a 38 °C setpoint, total device
+power was 1,903.31 W during heating and 2.85 W after `heater_off`.
+Setpoint behavior and simultaneous pump and heater operation remain untested.
+
 List navigation requires a known four-slot recipe list. Confirmation checks
 the expected highlighted slot, including wraparound.
 
