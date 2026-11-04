@@ -9,6 +9,15 @@
 
 A Home Assistant integration for Speidel Braumeister brewing systems via the My Speidel Cloud API. This integration allows you to monitor your Braumeister brewing process with real-time data and recipe information. It only works for Speidel Braumeister before the 2021 models at the moment.
 
+## Live test coverage for locales and units
+
+Live testing with MySpeidel and a physical Braumeister has so far used a German MySpeidel account, Celsius (°C), Plato (°P), and German date and time formats.
+
+- **MySpeidel account settings:** English, Fahrenheit (°F), and Specific Gravity (SG) have not been tested against the live API. Whether these settings change API values, units, field formats, or only the portal display is unknown. Test each setting separately against the German / °C / °P baseline, then test them together.
+- **System and browser locale:** Live tests with non-German system or browser languages and date/time formats, such as en-US, are pending. Test language and formatting separately while keeping the time zone fixed. Include 12-hour and 24-hour display, date rollover, and RTC monitoring where applicable.
+
+For the integration and Bridge, compare the cloud responses and the device messages seen by the Bridge. Verify current and target temperatures, recipe gravity, and RTC diagnostics in Home Assistant.
+
 ## Features
 
 ### Sensors
