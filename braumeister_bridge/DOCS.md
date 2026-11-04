@@ -129,14 +129,22 @@ enabling heat with the pump off. Disabling heat during a pause produced
 After disabling heat, the device still reported `Ph` at 40.5 °C with the
 42 °C setpoint. A new `$k=3` command changed `Ph → PH` at the same reported
 temperature with the pump running. The automatic restart temperature at
-this setpoint was not measured. These additional transitions were observed
-through MySpeidel. Local Bridge API control of those states remains untested.
+this setpoint was not measured.
+
+A hardware test of `0.3.2-control.3-beta.2` confirmed `heater_off` through the
+local Bridge API during a regulation pause. With a 42 °C setpoint, the
+device changed from `Pi` to `Ph` at 42.0 °C. About 15 minutes later it still
+reported `Ph` at 41.0 °C. The pump remained on and heating did not resume
+during that interval. The `pi → ph` transition was observed through
+MySpeidel and covered by an automated Bridge test.
 
 List navigation requires a known four-slot recipe list. Confirmation checks
 the expected highlighted slot, including wraparound.
 
-The Bridge requires recent status with both actuators off. HTTP 202 means the
-action is queued. Only one action can be pending across the Bridge.
+Menu navigation requires recent status with both actuators off. Actuator
+actions require a recent status matching their documented source flags.
+HTTP 202 means the action is queued. Only one action can be pending across
+the Bridge.
 
 The Bridge adds the key once on a fresh matching device poll with the
 standard successful cloud acknowledgment. Other cloud responses pass through
