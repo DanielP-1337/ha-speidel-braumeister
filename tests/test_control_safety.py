@@ -115,12 +115,20 @@ async def test_local_control_through_device_poll(bridge_module):
                 for action, before, after in (
                     ("heater_on", "ph", "pH"),
                     ("heater_off", "pH", "ph"),
+                    ("heater_off", "Pi", "Ph"),
+                    ("heater_off", "pi", "ph"),
                 ):
+                    assert await poll(4006, flags=before) == ack
                     assert (await enqueue(action)).status == 202
                     assert await poll(4006, flags=before) == b"Start\r\n$k=3\r\nOK\r\nDone\r\n"
                     assert await poll(4006, flags=before) == ack
                     assert await result() == "sent"
                     assert await poll(4006, flags=after) == ack
                     assert await result() == "confirmed"
+                assert await poll(4006, flags="Pi") == ack
+                assert (await enqueue("heater_off")).status == 202
+                assert await poll(4006, flags="PH") == ack
+                assert await result() == "state_changed"
+                assert (await enqueue("heater_off")).status == 409
             finally:
                 await bridge.close_session()

@@ -77,10 +77,10 @@ LOCAL_ACTIONS = {
     "recipe_up": ("2015", "2015", b"$k=3"),
 }
 ACTUATOR_FLAGS = {
-    "pump_on": ("ph", "Ph"),
-    "pump_off": ("Ph", "ph"),
-    "heater_on": ("ph", "pH"),
-    "heater_off": ("pH", "ph"),
+    "pump_on": {"ph": "Ph"},
+    "pump_off": {"Ph": "ph"},
+    "heater_on": {"ph": "pH"},
+    "heater_off": {"pH": "ph", "Pi": "Ph", "pi": "ph"},
 }
 ACTUATOR_OPTIONS = {
     "pump_on": "manual_pump_enabled",
@@ -297,7 +297,7 @@ class Bridge:
         if command and command["result"] == "sent":
             screen, flags, slot = self.control_screen(message[1])
             action = command["action"]
-            target_flags = ACTUATOR_FLAGS.get(action, ("ph", "ph"))[1]
+            target_flags = command["target_flags"]
             if (screen, flags) == (LOCAL_ACTIONS[action][1], target_flags) and (
                 command["target_slot"] is None or command["target_slot"] == slot
             ):
@@ -324,7 +324,7 @@ class Bridge:
                 and time.monotonic() - received < CONTROL_TIMEOUT):
             action = command["action"]
             before, _, key = LOCAL_ACTIONS[action]
-            source_flags = ACTUATOR_FLAGS.get(action, ("ph", "ph"))[0]
+            source_flags = command["source_flags"]
             screen, flags, slot = self.control_screen(message[1])
             if action in ACTUATOR_OPTIONS and self.options.get(ACTUATOR_OPTIONS[action]) is not True:
                 command["result"] = "state_changed"
@@ -520,8 +520,8 @@ class Bridge:
             raise web.HTTPBadRequest(text="Unsupported action")
         if action in ACTUATOR_OPTIONS and self.options.get(ACTUATOR_OPTIONS[action]) is not True:
             raise web.HTTPForbidden(text="Manual actuator control is disabled")
-        source_flags = ACTUATOR_FLAGS.get(action, ("ph", "ph"))[0]
-        if (screen, flags) != (LOCAL_ACTIONS[action][0], source_flags):
+        target_flags = ACTUATOR_FLAGS.get(action, {"ph": "ph"}).get(flags)
+        if screen != LOCAL_ACTIONS[action][0] or target_flags is None:
             raise web.HTTPConflict(text="Device screen or actuator state does not match")
         source_slot = target_slot = None
         if action in RECIPE_MOVES:
@@ -536,6 +536,7 @@ class Bridge:
         self.local_command = {
             "device_id": device_id, "action": action, "result": "queued",
             "source_slot": source_slot, "target_slot": target_slot,
+            "source_flags": flags, "target_flags": target_flags,
             "deadline": now + CONTROL_TIMEOUT,
         }
         return web.json_response({"result": "queued"}, status=202)

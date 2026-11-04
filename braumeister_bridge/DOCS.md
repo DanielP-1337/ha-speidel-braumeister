@@ -98,13 +98,13 @@ With `control_enabled: true`, local API clients can POST JSON containing
 | `open_recipe_selection` / `cancel_recipe_selection` | 101 ↔ 2015 |
 | `recipe_down` / `recipe_up` | 2015, change highlighted slot |
 | `pump_on` / `pump_off` | 4006, `ph → Ph` / `Ph → ph`, requires `manual_pump_enabled` |
-| `heater_on` / `heater_off` | 4006, `ph → pH` / `pH → ph`, requires `allow_remote_heating` |
+| `heater_on` | 4006, `ph → pH`, requires `allow_remote_heating` |
+| `heater_off` | 4006, `pH → ph`, `Pi → Ph`, or `pi → ph`, requires `allow_remote_heating` |
 
 Both actuator options default to false and also require `control_enabled`.
 The manual-mode keys toggle their respective actuator. This beta accepts
 only the tested single-actuator transitions. Use the heating option only
 for supervised tests below the setpoint and stop heating at the device.
-The meaning of the heater flag during temperature regulation remains unverified.
 
 On November 4, 2026, a hardware test of `0.3.2-control.3-beta.1` confirmed
 all four actions through the local Bridge API in manual mode (`4006`).
@@ -113,7 +113,24 @@ first pump-off attempt, the client-side status check stopped the request
 before submission. The next attempt used a fresh `Ph` status and succeeded.
 With the pump off, at 20 °C measured and a 38 °C setpoint, total device
 power was 1,903.31 W during heating and 2.85 W after `heater_off`.
-Setpoint behavior and simultaneous pump and heater operation remain untested.
+
+A separate manual-mode observation with a 26 °C setpoint and the pump running
+showed `PH → Pi` at 26.0 °C, `Pi → PH` at 25.5 °C, and `PH → Pi` again at
+26.0 °C, with no new heater command reported. During the first pause, HA
+showed the pump on and 11.87 W total device power. In this run, `Pi` was a
+regulation pause from which heating resumed automatically. The reported
+temperatures are observations from this run.
+
+A follow-up MySpeidel run with a 42 °C setpoint showed that `$k=2` changes
+the pump flag independently while the heater is active (`PH ↔ pH`) or
+paused (`Pi ↔ pi`). Above the setpoint, `$k=3` produced `ph → pi` when
+enabling heat with the pump off. Disabling heat during a pause produced
+`pi → ph` with the pump off and `Pi → Ph` with the pump still running.
+After disabling heat, the device still reported `Ph` at 40.5 °C with the
+42 °C setpoint. A new `$k=3` command changed `Ph → PH` at the same reported
+temperature with the pump running. The automatic restart temperature at
+this setpoint was not measured. These additional transitions were observed
+through MySpeidel. Local Bridge API control of those states remains untested.
 
 List navigation requires a known four-slot recipe list. Confirmation checks
 the expected highlighted slot, including wraparound.
