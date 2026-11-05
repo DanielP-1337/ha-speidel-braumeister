@@ -55,6 +55,10 @@ Custom templates comparing those literal strings may need adjustment.
 Local regression coverage: frozen payloads, missing/invalid timestamps, startup,
 source changes, backwards timestamps, recovery, retained activity, regulation and
 pump-pause flags, coordinator failure visibility, timer registration/removal.
-The HA lifecycle test uses API stubs, not a real HA runtime. Hardware validation
-and a real disconnect/reconnect test remain pending. No services were restarted
-or changed for these local tests.
+The HA lifecycle test uses API stubs, not a real HA runtime. The tester has now
+reported yellow-warning behavior after powering off an idle appliance and
+red-warning behavior after powering off with the heater last known active.
+These are power-loss tests, not network-only outages. Recovery/reconnection,
+outage during an automatic brew and an outage during regulation pause remain
+pending on hardware. The screenshots do not establish the exact detection delay.
+No services were restarted or changed for the local automated tests.
