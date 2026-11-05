@@ -322,12 +322,15 @@ class SpeidelBraumeisterDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     result['remaining_seconds'] = xhr_data.get('remaining_seconds')
                     result['elapsed_time'] = xhr_data.get('elapsed_time')
                     result['heating'] = xhr_data.get('heating', 'unknown')
+                    result['heater_enabled'] = xhr_data.get('heater_enabled')
                     result['pump'] = xhr_data.get('pump', 'unknown')
                     result['process_status'] = xhr_data.get('process_status', 'unknown')
                     result['state_code'] = xhr_data.get('state_code')
                     result['data_source'] = 'xhr'
                     result['device_timestamp'] = xhr_data.get('device_timestamp')
                     result['time_display'] = xhr_data.get('time_display')
+                    result.update({key: value for key, value in xhr_data.items()
+                                   if key.startswith('display_')})
                     self._remember_recipes(xhr_data.get('device_recipe_details'))
                     result['alarm'] = xhr_data.get('alarm')
                     result['connection_status'] = 'online'

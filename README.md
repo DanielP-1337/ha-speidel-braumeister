@@ -1,5 +1,7 @@
 # Speidel Braumeister Home Assistant Integration for Firmware V1.1.27 Sep 12 2018
 
+**Disclaimer:** This project is an independent open-source development and is not affiliated with, funded by, or endorsed by Speidel Tank- und Behälterbau GmbH or any of its affiliates. "Braumeister" and "MySpeidel" are trademarks of their respective owners.
+
 [![hacs][hacs-badge]][hacs]
 [![GitHub Release][release-badge]][release]
 [![License][license-badge]][license]
@@ -303,3 +305,9 @@ This project was developed with AI assistance: the first version (up to v2.0.3) 
 [license-badge]: https://img.shields.io/github/license/omphteliba/ha-speidel-braumeister
 [tests-badge]: https://github.com/omphteliba/ha-speidel-braumeister/actions/workflows/tests.yml/badge.svg
 [tests]: https://github.com/omphteliba/ha-speidel-braumeister/actions/workflows/tests.yml
+# Fork beta 3.1.1-beta.1: device heartbeat warning
+
+A passive device-connection diagnostic is described in
+[the watchdog notes](docs/device-connection-monitor.md). It distinguishes stale
+telemetry from fresh device evidence and retains last-known brewing/heating
+activity during an outage. Hardware validation is pending.

@@ -179,7 +179,8 @@ async def test_diagnostic_entities_registration_and_unknown_states():
         'rtc_entities.coordinator': mod('coordinator', SpeidelBraumeisterDataCoordinator=object),
         'rtc_entities.entity': mod('entity', SpeidelBraumeisterEntity=Entity),
         'homeassistant.config_entries': mod('config', ConfigEntry=object),
-        'homeassistant.core': mod('core', HomeAssistant=object),
+        'homeassistant.core': mod('core', HomeAssistant=object, callback=lambda fn: fn),
+        'homeassistant.helpers.event': mod('event', async_track_time_interval=lambda *args: lambda: None),
         'homeassistant.helpers.entity': mod('entity', EntityCategory=EntityCategory),
         'homeassistant.helpers.entity_platform': mod('platform', AddEntitiesCallback=object),
         'homeassistant.components.sensor': mod('sensor', SensorEntity=type('Sensor', (), {}), SensorEntityDescription=SimpleNamespace),
@@ -196,8 +197,9 @@ async def test_diagnostic_entities_registration_and_unknown_states():
         await binaries.async_setup_entry(hass, entry, entities.extend)
         offset = next(e for e in entities if e.entity_description.key == 'rtc_offset')
         warning = next(e for e in entities if e.entity_description.key == 'rtc_warning')
+        connection = next(e for e in entities if e.entity_description.key == 'connection_warning')
         # HA registry requires an enum instance; an equal string is rejected.
-        for entity in (offset, warning):
+        for entity in (offset, warning, connection):
             category = entity.entity_description.entity_category
             assert isinstance(category, EntityCategory)
             assert category is EntityCategory.DIAGNOSTIC
@@ -210,6 +212,21 @@ async def test_diagnostic_entities_registration_and_unknown_states():
         assert warning.is_on is None
         obj.data = None
         assert warning.is_on is None
+
+
+@pytest.mark.parametrize(("flags", "expected"), [
+    ("ph", ("p", "h")), ("Ph", ("P", "h")), ("pH", ("p", "H")),
+    ("PH", ("P", "H")), ("Pi", ("P", "i")), ("pi", ("p", "i")),
+    ("qH", ("q", "H")), ("bad", (None, None)),
+])
+def test_card_display_contract(dp, flags, expected):
+    values = ["0", "12:05", "C", "2820", "420", "42", "1200", "123", "1", "0",
+              "0", "0", "0", "000", flags, "000"]
+    result = dp.parse_bm_stat("v;TEST;1000;" + "X".join(values))
+    assert (result["display_pump_flag"], result["display_heater_flag"]) == expected
+    assert result["display_clock"] == "12:05"
+    assert result["display_time_target_seconds"] == 1200
+    assert result["display_time_elapsed_seconds"] == 123
 
 
 def test_manual_rtc_correction_reestablishes_baseline_then_clears_warning():
