@@ -107,6 +107,12 @@ After an abort the device goes straight back to `101`. Hop additions are state `
 beep (seen second-by-second via the Braumeister Bridge; the 30 s web polling missed them).
 Field 15 can also be `00Z` for a few seconds during a rest or the boil (meaning unknown).
 
+**2026-11-06 clarification:** the first Cancel at 2300/2410 opens the pause
+dialog, retaining that state code with flags `ph` and indicator `120`. It is not
+the final abort. The user reported a second Cancel returning to `101/ph/000`,
+and Select from the purge pause returning to `2300/Ph/000`. Resume at 2410 and
+the water prompt's delayed-start behavior remain separate unverified transitions.
+
 The heater flag is often `i` near the target temperature and while holding a rest; MySpeidel's display
 shows it as inactive. Field 13 `A00S` is not an alarm marker: it holds the labels of the display buttons.
 
