@@ -1,4 +1,4 @@
-# Passive device connection watchdog (3.1.1-beta.1)
+# Passive device connection watchdog (3.1.1-beta.2)
 
 Fork prerelease based on upstream integration v3.1.0, commit `8f61ab4`. This change does not
 change Bridge code or command handling. No additional cloud/device requests,
@@ -13,6 +13,13 @@ this working when the coordinator's requests fail or hang. Actual detection is
 within about five seconds of the threshold while HA's event loop is running.
 Network recovery is recognized on the next normal integration update, not by an
 extra probe. This is device-telemetry freshness, not proof of every LAN route.
+
+Beta 2 only publishes HA state when warning, risk or other meaningful metadata
+changes. This applies to timer and coordinator callbacks. `age_seconds` is no
+longer an entity attribute, and timestamp-only advancement does not publish.
+`last_device_timestamp` is a snapshot refreshed on meaningful publication,
+including expiry and recovery; it is not a continuously updated age indicator.
+The internal monotonic expiry still uses every valid advancing device sample.
 
 Startup is unknown until advancement is observed. No evidence for 120 seconds
 also raises a warning, with `evidence: unconfirmed`. Missing timestamps and

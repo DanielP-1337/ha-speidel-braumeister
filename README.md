@@ -305,9 +305,15 @@ This project was developed with AI assistance: the first version (up to v2.0.3) 
 [license-badge]: https://img.shields.io/github/license/omphteliba/ha-speidel-braumeister
 [tests-badge]: https://github.com/omphteliba/ha-speidel-braumeister/actions/workflows/tests.yml/badge.svg
 [tests]: https://github.com/omphteliba/ha-speidel-braumeister/actions/workflows/tests.yml
-# Fork beta 3.1.1-beta.1: device heartbeat warning
+# Fork beta 3.1.1-beta.2: device heartbeat warning
 
 A passive device-connection diagnostic is described in
 [the watchdog notes](docs/device-connection-monitor.md). It distinguishes stale
 telemetry from fresh device evidence and retains last-known brewing/heating
-activity during an outage. Hardware validation is pending.
+activity during an outage. Power-loss warning displays were confirmed by the
+tester; recovery and the new recorder-write suppression remain to be validated
+in real HA.
+
+Beta 2 suppresses unchanged periodic HA state writes and removes the running
+`age_seconds` attribute. See [release notes](docs/release-3.1.1-beta.2.md) for
+installation and the precise hardware-test coverage.
