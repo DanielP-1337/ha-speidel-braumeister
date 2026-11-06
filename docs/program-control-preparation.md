@@ -1,9 +1,7 @@
-# Program controls — local preparation, no HA deployment
+# Program controls — experimental beta, hardware validation pending
 
 Based on the existing experimental Bridge `0.3.2-control.3-beta.4` source.
-No release version was bumped and no update package was installed. The source
-must not be copied into HA as though this were an already validated release.
-
+Packaged as 0.3.2-control.4-beta.1 for controlled hardware testing. See [installation and rollback notes](release-control4-beta1.md). No HA update was performed here.
 ## Prepared transitions
 
 | Action | Required source | Required later confirmation | Key |
@@ -52,7 +50,6 @@ or productive directories are used. Coverage includes single dispatch,
 cloud-command priority, strict indicator confirmation, unknown contexts,
 dialog changes after enqueueing and permission revocation before dispatch.
 
-The matching Companion and Card branches are also local. Hardware validation,
-container build/smoke testing and an explicitly released installation package
-remain required before deployment. No heating, pumping or restart was initiated
-by the development tests.
+Matching betas: Companion 0.1.0-beta.6 and Card 0.7.0-beta.8.
+ARM64 container build and isolated synthetic smoke tests passed under emulation.
+Hardware validation of this local command path remains pending.

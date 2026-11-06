@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.2-control.4-beta.1
+
+- Recipe confirmation stops at the water prompt (2015 -> 2030).
+- Indicator-aware program pause and final abort for stages 2300 and 2410.
+- Resume is limited to pump purging at 2300 and requires both
+  `program_control_enabled` (new, default false) and `allow_remote_heating`.
+- Water confirmation, delayed-start keys and heating-stage resume stay unsupported.
+- Existing options, persistent data and manual actuator permissions are preserved.
+
 ## 0.3.0
 
 - Cloud lookups reject private/local answers, so a network-wide DNS rewrite (e.g. AdGuard
