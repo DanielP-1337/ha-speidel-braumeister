@@ -1,0 +1,5 @@
+Coordinated test release based on omphteliba/ha-speidel-braumeister main c524fe04. Includes the upstream recipe upload, HTTP backoff, reauthentication and device connection monitor. Restores fork display attributes for the clock, actuator flags and rest timer. The Card bundles eight languages and the matching Companion. Hardware validation of this combined build is pending.
+
+HACS: enable prereleases in the DanielP-1337 repositories and select Integration 3.2.1-beta.1, Display Card v0.7.0-beta.12 and Companion v0.1.0-beta.10. Restart Home Assistant after the integration downloads and reload the dashboard.
+
+Bridge 0.5.1-beta.1 is a separate HA app. For a local installation extract the attached ZIP into the addons share (braumeister_bridge/config.yaml), rebuild the local app and verify the version. Preserve your options, including dns_port: 0 with AdGuard. Later-stage brewing confirmations remain unsupported.
