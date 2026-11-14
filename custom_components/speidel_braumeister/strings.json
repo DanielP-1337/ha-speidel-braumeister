@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Speidel Braumeister Setup",
-        "description": "Enable Local Bridge only and leave credentials empty for local operation. Otherwise enter your MySpeidel credentials.",
+        "description": "Local operation requires the installed and configured Braumeister Bridge app. Enable Local Bridge only and leave credentials empty. For cloud operation, enter your MySpeidel credentials.",
         "data": {
           "username": "Username",
           "password": "Password",
@@ -31,7 +31,7 @@
       },
       "local": {
         "title": "Local Braumeister",
-        "description": "Use the device ID reported by the Bridge. No MySpeidel account is required. Set forward_to_cloud: false in the Bridge app. Local polling interval: 5 seconds.",
+        "description": "Select a device known to the Bridge. If none is found yet, switch on the Braumeister, check DNS routing to the Bridge and retry. A manually entered ID is checked before saving. No MySpeidel account is required. Set forward_to_cloud: false in the Bridge app. Local polling interval: 5 seconds.",
         "data": {
           "name": "Name",
           "machine_uuid": "Device ID / existing Machine UUID"
@@ -40,9 +40,10 @@
     },
     "error": {
       "invalid_auth": "Invalid username or password",
-      "cannot_connect": "Cannot connect to Speidel Cloud API",
+      "cannot_connect": "Cannot connect. In local mode, check that the Braumeister Bridge app is running; in cloud mode, check the connection to MySpeidel.",
       "unknown": "An unexpected error occurred",
-      "invalid_machine": "Device ID is required"
+      "no_local_devices": "The Bridge does not know any devices yet. Switch on the Braumeister, check DNS routing and retry.",
+      "unknown_local_device": "This device ID is not known to the Bridge. Check the ID and the connection from the Braumeister to the Bridge."
     },
     "abort": {
       "already_configured": "This Braumeister is already configured",

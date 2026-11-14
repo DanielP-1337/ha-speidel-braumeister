@@ -1,14 +1,17 @@
 """Config flow for Speidel Braumeister integration."""
 
+import asyncio
 import logging
 from collections.abc import Mapping
 from typing import Any, Optional
 
 import voluptuous as vol
+from aiohttp import ClientError, ClientTimeout
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import SpeidelApiError, SpeidelAuthError, SpeidelBraumeisterAPI, SpeidelConnectionError
 from .const import (
@@ -19,9 +22,29 @@ from .const import (
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     CONF_LOCAL_ONLY,
+    BRIDGE_STATUS_URL,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def async_bridge_devices(hass: HomeAssistant) -> list[str]:
+    """Read known devices locally; a known device need not currently be online."""
+    session = async_get_clientsession(hass)
+    async with session.get(BRIDGE_STATUS_URL, timeout=ClientTimeout(total=2)) as response:
+        response.raise_for_status()
+        status = await response.json()
+    if not isinstance(status, dict) or not isinstance(status.get("devices"), list):
+        raise ValueError("Invalid Bridge status")
+    devices = set()
+    for device in status["devices"]:
+        if not isinstance(device, dict) or not isinstance(device.get("device_id"), str):
+            raise ValueError("Invalid Bridge device")
+        device_id = device["device_id"].strip()
+        if not device_id:
+            raise ValueError("Empty Bridge device ID")
+        devices.add(device_id)
+    return sorted(devices)
 
 # Schema for authentication
 STEP_AUTH_DATA_SCHEMA = vol.Schema(
@@ -108,21 +131,39 @@ class SpeidelBraumeisterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_local(self, user_input=None) -> FlowResult:
         """Configure a local device without creating or authenticating a cloud client."""
         errors = {}
-        if user_input is not None:
+        devices = []
+        try:
+            devices = await async_bridge_devices(self.hass)
+        except (ClientError, asyncio.TimeoutError, ValueError):
+            errors["base"] = "cannot_connect"
+        else:
+            if not devices:
+                errors["base"] = "no_local_devices"
+        if user_input is not None and "cannot_connect" not in errors.values():
             machine = user_input[CONF_MACHINE_UUID].strip()
-            if not machine:
-                errors["base"] = "invalid_machine"
+            device_id = machine.split(".")[0].lower()
+            if self._device_already_configured(machine):
+                return self.async_abort(reason="already_configured")
+            if device_id not in {device.split(".")[0].lower() for device in devices}:
+                errors["base"] = "unknown_local_device"
             else:
-                self._async_abort_entries_match({CONF_MACHINE_UUID: machine})
-                await self.async_set_unique_id(machine.lower())
+                await self.async_set_unique_id(device_id)
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title=user_input.get("name", "Braumeister"), data={
                     CONF_MACHINE_UUID: machine, CONF_LOCAL_ONLY: True,
                 })
         return self.async_show_form(step_id="local", errors=errors, data_schema=vol.Schema({
-            vol.Required("name", default="Braumeister"): str,
-            vol.Required(CONF_MACHINE_UUID): str,
+            vol.Required("name", default=(user_input or {}).get("name", "Braumeister")): str,
+            vol.Required(CONF_MACHINE_UUID): vol.In(devices) if devices else str,
         }))
+
+    def _device_already_configured(self, machine: str) -> bool:
+        """Match both cloud combined UUIDs and local long IDs, including legacy entries."""
+        device_id = machine.split(".")[0].lower()
+        return any(
+            entry.data.get(CONF_MACHINE_UUID, "").strip().split(".")[0].lower() == device_id
+            for entry in self._async_current_entries()
+        )
 
     async def async_step_machine(
         self, user_input: Optional[dict[str, Any]] = None
@@ -133,6 +174,8 @@ class SpeidelBraumeisterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             machine_uuid = user_input[CONF_MACHINE_UUID].strip()
             name = user_input.get("name", "Braumeister")
+            if self._device_already_configured(machine_uuid):
+                return self.async_abort(reason="already_configured")
             # Entries created before unique IDs existed are matched by their data
             self._async_abort_entries_match({CONF_MACHINE_UUID: machine_uuid})
             await self.async_set_unique_id(machine_uuid.lower())
