@@ -26,6 +26,85 @@ mode and reported restarting the Bridge after the configuration change.
 These are qualitative hardware observations, not timed latency measurements.
 A full internet-disconnected test including HA/Bridge restart remains open.
 
+## Follow-up: WAN disconnected and brewer cold start
+
+The tester subsequently reported the following with `forward_to_cloud: false`
+after installing integration beta.4 (the active version was not re-read during
+this test). MySpeidel stopped updating and showed the brewer offline with its
+last known state.
+
+With the Speedport WAN cable physically disconnected, the existing local
+connection continued to support these operations without reported problems:
+
+- Manual mode to/from the main menu.
+- Pump on/off and heater on/off.
+- Starting recipe selection, recipe Up/Down and confirming the selection.
+- Reaching the "Water filled?" prompt; testing stopped there. Continuing beyond
+  this prompt or completing a brewing cycle was not validated.
+
+After powering the Braumeister off and on while WAN remained disconnected,
+no new connection was established. Thus continued operation across WAN loss
+is demonstrated by the tester, but offline cold-start/reconnection is currently
+failing. The layer responsible is not yet identified. HA/Bridge restart while
+offline remains a separate unverified case.
+
+Next investigation: correlate brewer Wi-Fi/DHCP registration, assigned DNS,
+AdGuard queries/responses (including A/AAAA and any additional startup domains),
+local DNS routing and Bridge request timestamps during an offline cold start.
+Check for client-specific rules affected by a changed address, external DNS
+fallback, or firmware startup dependencies. Do not assume AdGuard or NTP is the
+cause without observing the traffic. Record how long each attempt was observed.
+
+### Recovery after router restart with WAN restored
+
+The tester restarted the Speedport with the WAN cable connected and internet
+available. The Braumeister then reconnected to HA. After the tester confirmed
+water was filled on the physical brewer, the process continued; the supplied
+screenshot shows HA at "Pump is being purged" (20:33) while MySpeidel retains
+the old manual-mode state (20:01). MySpeidel remained offline/stale.
+
+Router restart and WAN restoration occurred together, so this does not establish
+that internet access itself was necessary for recovery. WLAN/DHCP/DNS recovery
+following the router restart remains an alternative explanation. No additional
+brewer restart was reported in this recovery step. Offline wait duration and
+recovery timing were not supplied.
+
+### Speedport limitation and phone observation
+
+The tester clarified that their Speedport Smart 4 explicitly requested a manual
+restart on its built-in display after checking/reconnecting the WAN cable; it
+did not restore the connection automatically in this test. Simply reconnecting
+WAN without a router restart is therefore not a useful control in this setup.
+This is a report of the observed setup, not a verified claim about every
+Speedport Smart 4 firmware/configuration.
+
+The tester also could not open/use the HA Companion app on their phone while
+connected to Wi-Fi with WAN unplugged. No error message, selected app URL or
+direct-LAN-IP browser result was recorded. This may share a local network/DNS
+cause with the brewer reconnection failure, or be a separate app routing issue
+(external URL, home-network recognition, or phone network selection). It does
+not establish that HA or the Bridge requires internet access.
+
+## Open community validation tasks
+
+- [ ] Repeat WAN-loss operation on another router/network; record component
+  versions, controller/firmware, DNS routing and observation durations.
+- [ ] Test a brewer cold start with WAN denied while WLAN, DHCP and local DNS
+  remain stable (for example, a router/firewall that supports per-device WAN
+  blocking). Capture network registration, DNS queries/answers and the first
+  Bridge request, or identify the step where progress stops.
+- [ ] Restart HA and the Bridge independently with WAN denied; confirm recovery
+  without cloud authentication and without a prior cached cloud connection.
+- [ ] Compare the phone app with access through the HA LAN IP in a browser;
+  record the app's internal/external URL and home-network recognition. Test
+  hostname resolution separately and note whether the phone stays on Wi-Fi.
+- [ ] Validate later brewing stages and recovery separately; the disconnected
+  hardware test above stopped at the water confirmation prompt.
+
+The current evidence supports continued local operation across WAN loss, not
+yet reliable end-to-end cold startup without WAN. Community reproductions are
+welcome; no cause-specific code fix is justified by the current evidence.
+
 ## TODO: compare reaction times with the controller generation from 2021
 
 - [ ] Identify an available newer controller and record model, hardware revision,
