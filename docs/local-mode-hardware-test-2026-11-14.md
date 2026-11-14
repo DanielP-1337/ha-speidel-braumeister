@@ -87,6 +87,10 @@ not establish that HA or the Bridge requires internet access.
 
 ## Open community validation tasks
 
+Investigation is paused at the tester's request. The tasks below remain open
+for community reproduction; no further network changes or hardware tests were
+performed after the reported recovery.
+
 - [ ] Repeat WAN-loss operation on another router/network; record component
   versions, controller/firmware, DNS routing and observation durations.
 - [ ] Test a brewer cold start with WAN denied while WLAN, DHCP and local DNS
@@ -104,6 +108,27 @@ not establish that HA or the Bridge requires internet access.
 The current evidence supports continued local operation across WAN loss, not
 yet reliable end-to-end cold startup without WAN. Community reproductions are
 welcome; no cause-specific code fix is justified by the current evidence.
+
+## Configuration clarification (code inspection, not another hardware test)
+
+- Integration local-only mode disables the integration's cloud clients. Bridge
+  forwarding is controlled independently by `forward_to_cloud`.
+- The supplied Bridge configuration shows forwarding disabled, `dns_port: 0`,
+  empty `upstream_dns`, `cloud_dns: [1.1.1.1]`, and
+  `cloud_host: api2.myspeidel.com`.
+- With `dns_port: 0`, the Bridge DNS listener is disabled. Empty `upstream_dns`
+  means automatic detection, not internet isolation. Changing it to loopback
+  would not simulate WAN loss in this configuration.
+- With forwarding disabled, the cloud resolver is not used for forwarding.
+  Changing or clearing `cloud_dns` therefore does not test whether the brewer
+  has other startup dependencies outside the LAN.
+- Keep `cloud_host` unchanged: the HTTP handler also uses it to recognize
+  incoming device requests. Changing it can break local request handling rather
+  than simulate an internet outage.
+- The phone might have used a Nabu Casa/external URL instead of the internal
+  connection. That possibility has not been verified and would not by itself
+  explain the brewer's reconnection failure. Check app routing separately;
+  see the [Companion networking documentation](https://companion.home-assistant.io/docs/troubleshooting/networking/).
 
 ## TODO: compare reaction times with the controller generation from 2021
 
