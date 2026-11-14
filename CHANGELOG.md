@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.1-beta.5] - 2026-11-14
+
+- Generic recipe-upload readiness, asynchronous start and job-status response actions for any HA client.
+- Requires Bridge 0.5.1-beta.3 for the new actions; existing local mode and recipe navigation fixes retained.
+- Uploads replace all device recipes. Count acknowledgment and optional content readback are reported separately.
+- Hardware validation pending. See docs/recipe-upload-api.md and docs/upload-beta-test.md.
+
 ## [Unreleased]
 
 ### Added

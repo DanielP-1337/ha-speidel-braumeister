@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1-beta.3
+
+- Generic readiness endpoint and uniquely identified upload jobs (last 32 retained until restart).
+- Optional fresh recipe-list comparison, distinct from count acknowledgment.
+- Recheck idle state before accepting the final upload acknowledgment.
+- Retains beta.2 recipe-navigation bounds and existing permissions. Hardware validation pending.
+
 ## Unreleased
 
 - Recipe upload without My Speidel (`recipe_write_enabled`, off by default): replaces all
