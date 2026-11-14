@@ -14,6 +14,13 @@ why. We don't own such a device, so we depend on owners to tell us what it sends
 
 None of the steps below sends anything to your Braumeister. They only read.
 
+## Planned comparison: controller generation from 2021
+
+- [ ] Compare end-to-end reaction times with the older controller once the newer
+  device's local transport is supported. Separate device reporting cadence,
+  command execution, HA updates and card rendering. See the
+  [local-mode hardware report and measurement checklist](local-mode-hardware-test-2026-11-14.md).
+
 ## 1. Install the integration and download the diagnostics
 
 1. Install the integration (HACS or manually) and add your Braumeister as described
