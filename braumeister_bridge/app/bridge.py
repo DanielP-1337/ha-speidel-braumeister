@@ -441,7 +441,7 @@ class Bridge:
         if command and command["device_id"] != device["device_id"]:
             command = None
         if command and command["result"] == "sent":
-            screen, flags, slot, count = self.control_screen(message[1])
+            screen, flags, slot, count = self.control_screen(message[1], device.get("rz", ""))
             if screen == control_transition(command)[1] and flags in command["target_flags"] and (
                 command["target_slot"] is None
                 or (command["target_slot"], command["recipe_count"]) == (slot, count)
@@ -469,7 +469,7 @@ class Bridge:
                 and device.get("bm_stat_received") == sample
                 and time.monotonic() - received < CONTROL_TIMEOUT):
             before, _, key = control_transition(command)
-            screen, flags, slot, count = self.control_screen(message[1])
+            screen, flags, slot, count = self.control_screen(message[1], device.get("rz", ""))
             action = command["action"]
             if action in ACTUATOR_OPTIONS and self.options.get(ACTUATOR_OPTIONS[action]) is not True:
                 command["result"] = "state_changed"
@@ -668,10 +668,23 @@ class Bridge:
         return fields[15] if len(fields) >= 16 else ""
 
     @staticmethod
-    def control_screen(payload: str) -> tuple[str, str, str, str]:
+    def control_screen(payload: str, recipes: str = "") -> tuple[str, str, str, str]:
         parts = payload.split(";", 4)
         fields = parts[3].split("X", 15) if len(parts) >= 4 else []
-        return (fields[3], fields[14], fields[9], fields[8]) if len(fields) >= 15 else ("", "", "", "")
+        if len(fields) < 15:
+            return ("", "", "", "")
+        count = fields[8]
+        # In recipe selection, field 8 can report 1 with nine installed recipes.
+        # Prefer a complete contiguous stored device list for navigation bounds.
+        slots = []
+        for line in recipes.splitlines():
+            head, sep, name = line.split(";", 1)[0].strip().partition(".")
+            values = head.split("X")
+            if sep and name.strip() and len(values) == 20 and all(v.lstrip("-").isdigit() for v in values):
+                slots.append(int(values[0]))
+        if fields[3] == "2015" and 1 <= len(slots) <= 9 and sorted(slots) == list(range(len(slots))):
+            count = str(len(slots))
+        return fields[3], fields[14], fields[9], count
 
     async def api_control(self, request: web.Request) -> web.Response:
         if self.options.get("control_enabled") is not True:
@@ -700,7 +713,7 @@ class Bridge:
         age = time.time() - device.get("bm_stat_received", 0)
         if not 0 <= age < CONTROL_TIMEOUT:
             raise web.HTTPConflict(text="Fresh device status required")
-        screen, flags, slot, count = self.control_screen(device.get("bm_stat", ""))
+        screen, flags, slot, count = self.control_screen(device.get("bm_stat", ""), device.get("rz", ""))
         if action not in LOCAL_ACTIONS and action not in PROGRAM_KEYS:
             raise web.HTTPBadRequest(text="Unsupported action")
         if action in ACTUATOR_OPTIONS and self.options.get(ACTUATOR_OPTIONS[action]) is not True:
