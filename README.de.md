@@ -15,8 +15,10 @@ In den Integrationsoptionen **Nur lokale Bridge (ohne Cloud)** aktivieren und
 in der Bridge-App `forward_to_cloud: false` setzen. Die Integration startet dann
 ohne Cloud-Anmeldung und fragt die lokale Bridge alle fünf Sekunden ab, ohne
 Cloud-Metadaten oder Cloud-Fallback. Bestehende Einträge und Entitäts-IDs bleiben
-erhalten. Für neue lokale Einträge genügt die Geräte-ID; ein MySpeidel-Konto ist
-nicht erforderlich. Siehe [Einrichtung und Testumfang](docs/local-bridge-mode.md).
+erhalten. Neue lokale Einträge wählen ein von der Bridge erkanntes Gerät aus;
+ein MySpeidel-Konto ist nicht erforderlich. Die Ersteinrichtung prüft, ob die
+Bridge erreichbar ist und das Gerät kennt. Bestehende Einträge starten weiterhin
+auch offline. Siehe [Einrichtung und Testumfang](docs/local-bridge-mode.md).
 
 ### Sensoren
 
