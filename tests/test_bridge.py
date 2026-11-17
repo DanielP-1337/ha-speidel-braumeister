@@ -149,7 +149,9 @@ async def test_device_message_forwarded_and_stored(bridge_module, diagnostics_en
                 assert not exported.exists()
             assert b"private" not in original
             assert DEVICE.encode() not in original
-            monkeypatch.setattr(bridge_module, "DIAGNOSTICS_LIMIT", len(original))
+            # One record fits even if the next timestamp has more decimal digits;
+            # two records still exceed the limit and exercise export rotation.
+            monkeypatch.setattr(bridge_module, "DIAGNOSTICS_LIMIT", len(original) + 64)
             resp = await port80.post("/braumeister/connect", data=message, headers=DEVICE_HEADERS)
             assert await resp.read() == answer
             await bridge.diagnostic_write

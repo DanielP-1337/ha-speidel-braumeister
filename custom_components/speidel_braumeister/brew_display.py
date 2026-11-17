@@ -83,7 +83,14 @@ def brew_display(fields):
                    and actuators[1] in ("H", "h", "i"))
     timed = code is not None and 2810 <= code < 2910
     target_seconds, elapsed_seconds = number(6), number(7)
+    delay = number(17)
+    delay_valid = (code == 2120 and field(13) == "A00S" and flags == "000"
+                   and field(17).isascii() and field(17).isdigit()
+                   and delay is not None and 0 <= delay <= 2147483647)
     return {"display_clock": clock if clock_valid else None,
+            "display_button_labels": field(13),
+            "display_editor_flags": flags,
+            "display_start_delay_seconds": delay if delay_valid else None,
             "display_pump_flag": actuators[0] if valid_flags else None,
             "display_heater_flag": actuators[1] if valid_flags else None,
             "display_time_target_seconds": target_seconds if timed and target_seconds is not None and target_seconds >= 0 else None,

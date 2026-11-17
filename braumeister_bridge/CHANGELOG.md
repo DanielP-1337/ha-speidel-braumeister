@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1-beta.5
+
+- Guarded manual temperature editor and delayed-start actions based on firmware
+  1.1.27 hardware observations; no raw key service or automatic command retries.
+- Confirming delayed start requires both program control and remote heating permissions.
+- Hidden delay-value changes remain unconfirmed; a matching screen is not a value acknowledgment.
+- Countdown cancellation checks the return to the main menu and field 17 reset.
+- Existing diagnostic export remains available.
+
 ## 0.5.1-beta.4
 
 - Diagnostic format v2 captures status fields 13 and 15 plus numeric context,

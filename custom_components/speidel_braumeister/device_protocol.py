@@ -36,7 +36,8 @@ STATE_MAIN_MENU = 101
 STATE_BREW_FINISHED = 3450
 # Recipe selected, program not started yet: recipe list (2015) and the start
 # screen "Wasser eingefüllt?" with its start delay (2030). Nothing heats here.
-PRE_START_STATES = {2015, 2030}
+# A confirmed countdown (2120) stays an active program: it can start heating later.
+PRE_START_STATES = {2015, 2030, 2111}
 PROGRESS_FULL = 318
 
 # An alarm is active while the device beeps, as in MySpeidel's own web display:

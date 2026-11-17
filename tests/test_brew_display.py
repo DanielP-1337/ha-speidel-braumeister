@@ -8,6 +8,15 @@ from conftest import device_protocol
 brew_display = importlib.import_module('protocol_tests.brew_display').brew_display
 
 
+@pytest.mark.parametrize('code,value,expected', [(2120,'3599',3599),(2120,'0',0),
+    (2120,'-1',None),(2120,'NaN',None),(2120,'1.5',None),(2111,'3599',None),(101,'3599',None)])
+def test_start_delay_seconds(code,value,expected):
+    data = fields(code, pump='p') + ['0',value,'0']
+    assert brew_display(data)['display_start_delay_seconds'] == expected
+    data[15] = '120'
+    assert brew_display(data)['display_start_delay_seconds'] is None
+
+
 def fields(code, pump='P', indicator='000', rest='1', hop='0'):
     return ['0', '17:42', 'C', str(code), '720', '72.5', '2700', '120', '1', '0',
             rest, hop, '100', 'A00S', pump + 'i', indicator]

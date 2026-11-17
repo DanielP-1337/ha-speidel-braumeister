@@ -64,12 +64,24 @@ Payload is 19 fields separated by `X`:
 | 10 | `0`, `5` | Unknown; became `5` at rest end and stayed until the end |
 | 11 | `0`, `-1` | *Hypothesis:* hop addition state; changed from `0` to `-1` at the hop addition 10 min before the end of the boil |
 | 12 | `0`…`318` | Unknown, counts up during a program (about 3 per minute while boiling) |
-| 13 | `EMSR`, `APHT`, `ADUS`, `A000`, `A00F`, `A00S` | Screen/message code (see below) |
+| 13 | `EMSR`, `APHT`, `ADUS`, `A000`, `A00F`, `A00S` | Four button labels. Hardware-confirmed: EMSR main menu, APHT manual mode, ADUS manual editor/start-delay selection, A00S active start countdown |
 | 14 | `ph`, `Ph`, `pH`, `PH`, `qh`, `qH`, `Pi`, `pi` | **Actuator flags**, as read by MySpeidel's own web display (`parseStatus`/`updateScreen` in `bm_controll.min.js`): 1st char pump, 2nd char heater. `P`/`H` = active, `q`/`i` = shown as inactive, `p`/`h` = unmarked. The parser maps `q`/`i` to off. `q` appears during the boil, `i` near the target temperature |
 | 15 | `000`, `010`, `0D0`, `00T`, `120` | **Alarm indicator** (middle character): `1` = alarm (mash-in temperature reached, rest end, brew finished), `D` = remove lid (from 99 °C while heating to boil). `00T` while editing the manual-mode target temperature, `120` together with `A00F` |
-| 16–18 | `0` | Unknown |
+| 16, 18 | `0` | Unknown |
+| 17 | `3599`, `3598`, ... | Remaining delayed-start seconds in state `2120`, confirmed on firmware 1.1.27. Reset to `0` after countdown Abort. Do not interpret outside this state |
 
 #### State codes (field 3) — *hypotheses*
+
+Hardware observations from 2026-11-17 supersede hypotheses for the manual
+temperature editor and delayed start: see [manual editor evidence](manual-editor-hardware-2026-11-17.md)
+and [delay/countdown evidence](start-delay-hardware-2026-11-17.md).
+Field 15 `00T` can persist in the main menu after editor Abort; it is not a
+standalone editor discriminator. Keys are contextual: in state 4007,
+1=Abort to main/discard edit, 2=Down, 3=Up, 4=Select to manual mode.
+State 2030 plus Up enters 2111; Up/Down adjust the delay by +/-30 minutes
+(observed on the physical display), Select enters 2120 with a readable
+field-17 countdown, and Abort from 2120 returns to 101 and clears field 17.
+No rest/boil editor or Select-during-countdown mapping is claimed.
 
 | Code | Field 13 | Observed context |
 |---|---|---|
