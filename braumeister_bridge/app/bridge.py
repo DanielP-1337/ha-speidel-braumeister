@@ -93,6 +93,7 @@ MAPPING_KEYS = {
     "confirm_temperature": 4, "cancel_temperature": 1,
     "start_delay_up": 3, "start_delay_down": 2, "confirm_start_delay": 4,
     "cancel_water_prompt": 1, "cancel_start_delay": 1,
+    "start_now": 4,
 }
 
 
@@ -132,6 +133,10 @@ def mapping_rule(action, payload):
             targets = {3: "2120", 13: "A00S", 15: "000"}
     elif action == "cancel_start_delay" and (screen, labels, indicator) == ("2120", "A00S", "000"):
         targets = {3: "101", 13: "EMSR", 15: "000", 17: "0"}
+    elif action == "start_now" and (screen, labels, indicator) == ("2120", "A00S", "000"):
+        if not re.fullmatch(r"[0-9]{1,10}", f[17]) or not 0 < int(f[17]) <= 2147483647:
+            return None
+        targets = {3: "2300", 13: "A000", 14: "Ph", 15: "000", 17: "0"}
     if not targets:
         return None
     return {"guard": guard, "targets": targets, "unverified": unverified}
@@ -564,9 +569,10 @@ class Bridge:
                 command["result"] = "state_changed"
             elif action == "resume_program" and not self.program_resume_allowed():
                 command["result"] = "state_changed"
-            elif action == "confirm_start_delay" and not self.program_resume_allowed():
+            elif action in ("confirm_start_delay", "start_now") and not self.program_resume_allowed():
                 command["result"] = "state_changed"
-            elif command.get("mapping") and not mapping_matches(message[1], command["mapping"]["guard"]):
+            elif command.get("mapping") and (not mapping_matches(message[1], command["mapping"]["guard"])
+                                              or mapping_rule(action, message[1]) is None):
                 command["result"] = "state_changed"
             elif (screen, flags) != (before, command["source_flags"]) or (
                 command["source_slot"] is not None
@@ -842,13 +848,13 @@ class Bridge:
         source_indicator = target_indicator = target_screen = None
         mapping = None
         if action in MAPPING_KEYS:
-            if action == "confirm_start_delay" and not self.program_resume_allowed():
+            if action in ("confirm_start_delay", "start_now") and not self.program_resume_allowed():
                 raise web.HTTPForbidden(text="Delayed start requires program_control_enabled and allow_remote_heating")
             mapping = mapping_rule(action, device.get("bm_stat", ""))
             if mapping is None:
                 raise web.HTTPConflict(text="Unverified editor state, flags, unit or value")
             target_screen = mapping["targets"][3]
-            target_flags = ("ph",)
+            target_flags = ("Ph",) if action == "start_now" else ("ph",)
         elif action in PROGRAM_KEYS:
             if action == "resume_program" and not self.program_resume_allowed():
                 raise web.HTTPForbidden(text="Program resume requires program_control_enabled and allow_remote_heating")

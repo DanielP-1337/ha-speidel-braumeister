@@ -12,6 +12,7 @@ def message(screen, labels, indicator="000", target="380", delay="0", flags="ph"
 
 
 @pytest.mark.parametrize("action,before,after,key,result", [
+    ("start_now", (2120,"A00S","000","380","3531"), (2300,"A000","000","380","0","Ph"), 4, "confirmed"),
     ("open_temperature_editor", (4006,"APHT"), (4007,"ADUS","00T"), 4, "confirmed"),
     ("temperature_up", (4007,"ADUS","00T"), (4007,"ADUS","00T","390"), 3, "confirmed"),
     ("temperature_down", (4007,"ADUS","00T","390"), (4007,"ADUS","00T"), 2, "confirmed"),
@@ -35,7 +36,7 @@ async def test_mapping_exchange(bridge_module, action, before, after, key, resul
             return await api.post('/api/control', json={'device_id':DEVICE, 'action':action})
         try:
             await poll(before)
-            if action == 'confirm_start_delay':
+            if action in ('confirm_start_delay', 'start_now'):
                 assert (await queue()).status == 403
                 bridge.options['program_control_enabled'] = True
                 assert (await queue()).status == 403
@@ -55,6 +56,11 @@ async def test_mapping_exchange(bridge_module, action, before, after, key, resul
 
 
 @pytest.mark.parametrize('action,args', [
+    ('start_now',(2030,'ADUS')), ('start_now',(2111,'ADUS')),
+    ('start_now',(2120,'A00S','000','380','0')),
+    ('start_now',(2120,'A00S','000','380','-1')),
+    ('start_now',(2120,'A00S','120','380','3531')),
+    ('start_now',(2120,'A00S','000','380','3531','Ph')),
     ('start_delay_down',(2030,'ADUS')), ('cancel_water_prompt',(2030,'ADUS')),
     ('confirm_start_delay',(2120,'A00S')), ('temperature_up',(101,'EMSR','00T')),
     ('temperature_up',(4007,'ADUS','000')), ('temperature_up',(4007,'ADUS','00T','380','0','PH')),
@@ -73,13 +79,16 @@ async def test_source_change_and_permission_revocation(bridge_module):
             async def poll(args):
                 return await (await device.post('/braumeister/connect',data=message(*args),headers=DEVICE_HEADERS)).read()
             for action, before, changed in [
+                ('start_now',(2120,'A00S','000','380','3531'),(2120,'A00S','000','380','0')),
                 ('temperature_up',(4007,'ADUS','00T'),(4007,'ADUS','00T','390')),
                 ('start_delay_up',(2111,'ADUS'),(2111,'A000')),
                 ('confirm_start_delay',(2111,'ADUS'),(2111,'ADUS')),
+                ('start_now',(2120,'A00S','000','380','3531'),(2120,'A00S','000','380','3530')),
             ]:
+                bridge.options['allow_remote_heating'] = True
                 await poll(before)
                 assert (await api.post('/api/control',json={'device_id':DEVICE,'action':action})).status == 202
-                if action == 'confirm_start_delay':
+                if action == 'confirm_start_delay' or (action == 'start_now' and changed[-1] == '3530'):
                     bridge.options['allow_remote_heating'] = False
                 assert await poll(changed) == bridge_module.LOCAL_ANSWER
                 assert bridge.local_command['result'] == 'state_changed'

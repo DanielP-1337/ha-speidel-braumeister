@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1-beta.6
+
+- Add guarded countdown Start now based on the observed key-4 transition to pump purging.
+- Require a positive countdown, fresh context, program control and remote heating permissions, rechecked before send.
+- Confirm the pump-purging state and countdown reset; never automatically retry the command.
+
 ## 0.5.1-beta.5
 
 - Guarded manual temperature editor and delayed-start actions based on firmware

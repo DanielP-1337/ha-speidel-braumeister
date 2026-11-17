@@ -133,3 +133,46 @@ remaining delay. Thus Abort from the active countdown cancels the delayed
 start and returns to the main menu in this trial. Select during countdown and
 expiry at zero remain untested. Snapshot preserved as
 `captures/2026-11-17-start-delay/diagnostics-countdown-abort.jsonl`.
+
+## HA beta hardware validation
+
+User tested the coordinated HA beta through the Display Card and compared it
+with MySpeidel. Both Up commands, confirmation and countdown Abort have source
+`local_control`, confirming the HA/Companion/Bridge path rather than cloud keys.
+Sequence numbers below belong to the new session after the Bridge restart.
+
+| CET on November 17 | Command record | Action | Next status |
+|---|---|---|---|
+| 23:53:03.062 | 496 | `$k=3` from 2030 | 498: 2111 |
+| 23:53:09.361 | 521 | `$k=3` from 2111 | 523: 2111 |
+| 23:54:15.007 | 607 | `$k=4` from 2111 | 609: 2120 / A00S, field 17 = 3599 |
+| 23:55:37.042 | 655 | `$k=1` from 2120, field 17 = 3518 | 657: 101 / EMSR, field 17 = 0 |
+
+Screenshots show HA's device-derived 0:59:44 countdown alongside MySpeidel's
+0 h 59 min display, followed by the main menu in both. All listed records
+have flags ph and HTTP 200. The screenshot's unconfirmed message during delay
+selection is expected: the hidden selected value is not acknowledged in 2111;
+the later 3599-second countdown confirms the combined one-hour selection.
+The disabled Select button during countdown is intentional and remains untested.
+
+Snapshot: `captures/2026-11-17-start-delay/diagnostics-ha-validation.jsonl`.
+The file spans two sessions; sequence resets must not be mistaken for missing
+records. This validates the HA Up/Up/Select/Abort path, not HA Down, manual
+editor actions, countdown expiry or Select during countdown.
+
+Additional observation from the same snapshot: cloud `$k=1` in state 2030 at
+23:45:50.160 (record 21 of the new session) returns to state 101 at 23:45:52.144
+(record 23). This is evidence for initial water-prompt Abort, previously absent
+from the captured paths; it is not yet enabled by the published beta.
+
+## Select during countdown: immediate program start, November 18
+
+User repeated HA Up/Up/Select and then pressed Select in MySpeidel while the
+countdown was running. At 00:02:01.068 CET, record 1077 of the post-restart
+session contains cloud `$k=4` in 2120 / A00S / 000 / ph, field 17 = 3531.
+At 00:02:02.219, record 1079 reports 2300 / A000 / 000 / Ph, field 17 = 0,
+field 7 = 1. Screenshot shows pump purging. This skips the remaining delay
+and starts the program immediately; it is not cancellation back to the menu.
+The HA implementation of this newly observed action still needs hardware testing.
+Automatic countdown expiry remains untested. Capture saved locally as
+`captures/2026-11-17-start-delay/diagnostics-countdown-start-now.jsonl`.

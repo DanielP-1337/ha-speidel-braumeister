@@ -1,3 +1,5 @@
+> New: [Start now beta](docs/start-now-beta.md).
+
 > New hardware-mapping beta: [versions, installation and test guide](docs/mapping-beta.md).
 
 # Speidel Braumeister Home Assistant Integration for Firmware V1.1.27 Sep 12 2018

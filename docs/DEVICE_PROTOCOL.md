@@ -81,7 +81,11 @@ standalone editor discriminator. Keys are contextual: in state 4007,
 State 2030 plus Up enters 2111; Up/Down adjust the delay by +/-30 minutes
 (observed on the physical display), Select enters 2120 with a readable
 field-17 countdown, and Abort from 2120 returns to 101 and clears field 17.
-No rest/boil editor or Select-during-countdown mapping is claimed.
+Select during countdown was confirmed on November 18: key 4 from
+2120 / A00S / 000 / ph (field 17 positive) transitions to
+2300 / A000 / 000 / Ph with field 17 zero, starting pump purging immediately.
+The guarded `start_now` action requires program control and remote heating
+permissions. Rest/boil editors and automatic countdown expiry remain unverified.
 
 | Code | Field 13 | Observed context |
 |---|---|---|
