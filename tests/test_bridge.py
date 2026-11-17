@@ -92,10 +92,13 @@ async def make_bridge(bridge_module, cloud_url, passthrough_url=""):
 
 
 @pytest.mark.parametrize("diagnostics_enabled", [False, True])
-async def test_device_message_forwarded_and_stored(bridge_module, diagnostics_enabled, tmp_path, monkeypatch):
+@pytest.mark.parametrize("export_enabled", [False, True])
+async def test_device_message_forwarded_and_stored(bridge_module, diagnostics_enabled, export_enabled, tmp_path, monkeypatch):
     received = []
     capture = tmp_path / "diagnostics-summary.jsonl"
     monkeypatch.setattr(bridge_module, "DIAGNOSTICS_FILE", capture)
+    exported = tmp_path / "export.jsonl"
+    monkeypatch.setattr(bridge_module, "DIAGNOSTICS_EXPORT", exported)
     answer = b"Start\r\n$k=1\r\n$rz=private-account;private-signature\r\nOK\r\nDone\r\n"
 
     async def fake_cloud(request):
@@ -108,6 +111,7 @@ async def test_device_message_forwarded_and_stored(bridge_module, diagnostics_en
     await cloud.start_server()
     bridge, port80, api = await make_bridge(bridge_module, str(cloud.make_url("")))
     bridge.options["diagnostics_enabled"] = diagnostics_enabled
+    bridge.options["diagnostics_export_to_share"] = export_enabled
     message = BM_STAT.replace(b"00000000;00000000", b"private-account;private-signature")
     try:
         resp = await port80.post("/braumeister/connect", data=message, headers=DEVICE_HEADERS)
@@ -128,23 +132,68 @@ async def test_device_message_forwarded_and_stored(bridge_module, diagnostics_en
             original = capture.read_bytes()
             entry = json.loads(original)
             assert isinstance(entry.pop("time"), float)
+            assert entry.pop("session") == bridge.diagnostic_session
             assert entry == {
+                "format_version": 2, "sequence": 1,
                 "status": 200, "source": "cloud", "keys": [1], "command_count": 2,
                 "state": 2820, "actuators": "Pi",
+                "field_13": "A00S", "field_15": "000", "temperature_unit": "C",
+                "field_0": "0", "field_4": "400", "field_5": "40.5",
+                "field_6": "60", "field_7": "16", "field_8": "5", "field_9": "2",
+                "field_10": "0", "field_11": "0", "field_12": "55",
+                "field_16": "0", "field_17": "0", "field_18": "0",
             }
+            if export_enabled:
+                assert exported.read_bytes() == original
+            else:
+                assert not exported.exists()
+            assert b"private" not in original
+            assert DEVICE.encode() not in original
             monkeypatch.setattr(bridge_module, "DIAGNOSTICS_LIMIT", len(original))
             resp = await port80.post("/braumeister/connect", data=message, headers=DEVICE_HEADERS)
             assert await resp.read() == answer
             await bridge.diagnostic_write
             assert capture.read_bytes() == original
             assert (await (await api.get("/api/health")).json())["diagnostics_missed"] == 1
+            if export_enabled:
+                assert json.loads(exported.read_bytes())["sequence"] == 2
+                assert exported.with_suffix(".previous.jsonl").read_bytes() == original
+                health = await (await api.get("/api/health")).json()
+                assert health["diagnostics_export_written"] == 2
+                assert health["diagnostics_export_missed"] == 0
         else:
             assert not capture.exists()
+            assert not exported.exists()
     finally:
         await port80.close()
         await api.close()
         await cloud.close()
         await bridge.close_session()
+
+
+def test_diagnostic_export_refuses_nonregular_and_missing_paths(bridge_module, tmp_path):
+    destination = tmp_path / "directory.jsonl"
+    destination.mkdir()
+    assert not bridge_module.export_diagnostic(destination, b"{}\n")
+    assert not bridge_module.export_diagnostic(tmp_path / "missing" / "file.jsonl", b"{}\n")
+    destination = tmp_path / "file.jsonl"
+    destination.with_suffix(".previous.jsonl").mkdir()
+    assert not bridge_module.export_diagnostic(destination, b"{}\n")
+
+
+async def test_diagnostic_editor_fields_and_export_failure(bridge_module, tmp_path, monkeypatch):
+    monkeypatch.setattr(bridge_module, "DIAGNOSTICS_FILE", tmp_path / "private.jsonl")
+    monkeypatch.setattr(bridge_module, "DIAGNOSTICS_EXPORT", tmp_path / "missing" / "export.jsonl")
+    bridge = bridge_module.Bridge({**bridge_module.DEFAULTS, "diagnostics_export_to_share": True})
+    message = BM_STAT.replace(b"A00SXPiX000", b"ADUSXPHX00T")
+    bridge.record_diagnostic(message, ["$k=4"], 200, "local_control")
+    await bridge.diagnostic_write
+    entry = json.loads((tmp_path / "private.jsonl").read_bytes())
+    assert entry["field_13"] == "ADUS"
+    assert entry["field_15"] == "00T"
+    assert entry["keys"] == [4]
+    assert bridge.diagnostic_export_missed == 1
+    assert bridge.diagnostic_missed == 0
 
 
 async def test_local_answer_when_cloud_down(bridge_module):

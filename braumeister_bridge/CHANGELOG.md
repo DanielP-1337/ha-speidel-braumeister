@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1-beta.4
+
+- Diagnostic format v2 captures status fields 13 and 15 plus numeric context,
+  temperature unit, session ID and sequence number for mapping investigations.
+- Optional continuous sanitized export to `/share`, with two bounded 1 MiB files.
+- Health counters expose export successes/failures; device forwarding is unchanged.
+- No new button mappings or remote heating behavior are enabled.
+
 ## 0.5.1-beta.3
 
 - Generic readiness endpoint and uniquely identified upload jobs (last 32 retained until restart).

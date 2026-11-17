@@ -1,5 +1,5 @@
 name: Braumeister Bridge
-version: "0.5.1-beta.3"
+version: "0.5.1-beta.4"
 slug: braumeister_bridge
 description: Receives the Speidel Braumeister's cloud traffic locally (DNS + port 80) for the Speidel Braumeister integration
 url: https://github.com/omphteliba/ha-speidel-braumeister
@@ -9,6 +9,8 @@ arch:
 init: false
 startup: services
 host_network: true
+map:
+  - share:rw
 options:
   bridge_ip: ""
   cloud_host: api2.myspeidel.com
@@ -21,6 +23,7 @@ options:
   api_port: 8642
   log_level: info
   diagnostics_enabled: false
+  diagnostics_export_to_share: false
   control_enabled: false
   program_control_enabled: false
   manual_pump_enabled: false
@@ -39,6 +42,7 @@ schema:
   api_port: port
   log_level: list(debug|info|warning|error)
   diagnostics_enabled: bool
+  diagnostics_export_to_share: bool
   control_enabled: bool
   program_control_enabled: bool
   manual_pump_enabled: bool

@@ -41,6 +41,7 @@ _LOGGER = logging.getLogger("braumeister_bridge")
 
 OPTIONS_FILE = Path(os.environ.get("BRIDGE_OPTIONS", "/data/options.json"))
 DIAGNOSTICS_FILE = Path("/data/diagnostics-summary.jsonl")
+DIAGNOSTICS_EXPORT = Path("/share/braumeister-bridge-diagnostics.jsonl")
 DIAGNOSTICS_LIMIT = 1024 * 1024
 DEFAULTS: dict[str, Any] = {
     "bridge_ip": "",
@@ -55,6 +56,7 @@ DEFAULTS: dict[str, Any] = {
     "api_host": "127.0.0.1",
     "log_level": "info",
     "diagnostics_enabled": False,
+    "diagnostics_export_to_share": False,
     "control_enabled": False,
     "manual_pump_enabled": False,
     "allow_remote_heating": False,
@@ -195,6 +197,27 @@ def append_diagnostic(path: Path, line: bytes) -> bool:
     return True
 
 
+def export_diagnostic(path: Path, line: bytes) -> bool:
+    """Append a sanitized record; retain at most two bounded files in /share."""
+    previous = path.with_suffix(".previous.jsonl")
+    try:
+        # Reject symlinks and non-regular files, including during rotation.
+        for candidate in (path, previous):
+            try:
+                info = candidate.lstat()
+            except FileNotFoundError:
+                continue
+            if not stat.S_ISREG(info.st_mode):
+                return False
+        if len(line) > DIAGNOSTICS_LIMIT:
+            return False
+        if path.exists() and path.stat().st_size + len(line) > DIAGNOSTICS_LIMIT:
+            os.replace(path, previous)
+        return append_diagnostic(path, line)
+    except OSError:
+        return False
+
+
 def load_options(path: Path = OPTIONS_FILE) -> dict[str, Any]:
     options = dict(DEFAULTS)
     if path.exists():
@@ -322,6 +345,10 @@ class Bridge:
         self.cloud_resolver = None
         self.diagnostic_write: asyncio.Task | None = None
         self.diagnostic_missed = 0
+        self.diagnostic_export_missed = 0
+        self.diagnostic_export_written = 0
+        self.diagnostic_session = uuid.uuid4().hex
+        self.diagnostic_sequence = 0
         self.local_command: dict[str, Any] | None = None
         self.recipe_job: dict[str, Any] | None = None
         self.recipe_jobs: dict[str, dict[str, Any]] = {}
@@ -523,10 +550,14 @@ class Bridge:
         return response
 
     def record_diagnostic(self, body: bytes, commands: list[str], status: int, source: str) -> None:
+        self.diagnostic_sequence += 1
         if self.diagnostic_write is not None and not self.diagnostic_write.done():
             self.diagnostic_missed += 1
             return
         entry = {
+            "format_version": 2,
+            "session": self.diagnostic_session,
+            "sequence": self.diagnostic_sequence,
             "time": time.time(), "status": status, "source": source,
             "keys": [int(command[-1]) for command in commands[:8] if re.fullmatch(r"\$k=[1-4]", command)],
             "command_count": len(commands),
@@ -534,17 +565,34 @@ class Bridge:
         message = self.split_message(body)
         if message and message[0] == "bm_stat":
             parts = message[1].split(";", 4)
-            fields = parts[3].split("X", 15) if len(parts) >= 4 else []
+            fields = parts[3].split("X", 19) if len(parts) >= 4 else []
             if len(fields) >= 15 and re.fullmatch(r"[0-9]{1,4}", fields[3]):
                 entry["state"] = int(fields[3])
                 if re.fullmatch(r"[pPq][hHi]", fields[14]):
                     entry["actuators"] = fields[14]
+                if re.fullmatch(r"[A-Za-z0-9]{4}", fields[13]):
+                    entry["field_13"] = fields[13]
+                if len(fields) >= 16 and re.fullmatch(r"[A-Za-z0-9]{3}", fields[15]):
+                    entry["field_15"] = fields[15]
+                if fields[2] in ("C", "F"):
+                    entry["temperature_unit"] = fields[2]
+                # Preserve numeric wire values; field 4 is tenths, including -1000.
+                for index in (0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17, 18):
+                    if index < len(fields):
+                        value = fields[index].strip()
+                        if re.fullmatch(r"-?[0-9]{1,9}(?:\.[0-9]{1,4})?", value):
+                            entry[f"field_{index}"] = value
         self.diagnostic_write = asyncio.create_task(self.write_diagnostic(entry))
 
     async def write_diagnostic(self, entry: dict[str, Any]) -> None:
         line = (json.dumps(entry) + "\n").encode("ascii")
         if not await asyncio.to_thread(append_diagnostic, DIAGNOSTICS_FILE, line):
             self.diagnostic_missed += 1
+        if self.options.get("diagnostics_export_to_share"):
+            if await asyncio.to_thread(export_diagnostic, DIAGNOSTICS_EXPORT, line):
+                self.diagnostic_export_written += 1
+            else:
+                self.diagnostic_export_missed += 1
 
     async def forward_to_cloud(self, request: web.Request, body: bytes) -> tuple[int, dict[str, str], bytes]:
         # Guarded cloud resolution blocks rewrites back to this bridge.
@@ -897,6 +945,10 @@ class Bridge:
         health = {"ok": True, "devices": len(self.devices)}
         if self.options.get("diagnostics_enabled"):
             health["diagnostics_missed"] = self.diagnostic_missed
+            if self.options.get("diagnostics_export_to_share"):
+                health["diagnostics_export_path"] = str(DIAGNOSTICS_EXPORT)
+                health["diagnostics_export_written"] = self.diagnostic_export_written
+                health["diagnostics_export_missed"] = self.diagnostic_export_missed
         return web.json_response(health)
 
 

@@ -92,6 +92,13 @@ Set `diagnostics_enabled: true` to record a compact local summary of completed
 device exchanges in `/data/diagnostics-summary.jsonl`. Each entry contains the
 Bridge timestamp, response source and HTTP status, command count, recognized
 key numbers, and, for status messages, the screen code and actuator flags.
+Format version 2 also includes field 13 (four button labels), field 15
+(indicator/editor flags), temperature unit, and numeric wire fields 0, 4–12,
+and 16–18. Field 4 is the target in tenths (including the -1000 sentinel);
+field 5 is the actual temperature, fields 6/7 are duration/elapsed seconds.
+Values remain strings in their original device unit; no interpretation is
+silently applied. Each process has a random session ID and increasing sequence
+number; sequence gaps reveal exchanges skipped while the writer was busy.
 The recorder stores only these fields. Device IDs, account data, signatures,
 recipe contents, headers and raw bodies are excluded.
 
@@ -99,6 +106,50 @@ The file is capped at 1 MiB and is kept across restarts. The local health API
 reports `diagnostics_missed` for writes skipped because the writer is busy,
 the file is full, or storage is unavailable. To start a fresh capture, stop
 the app, archive or remove the summary file, then start the app again.
+
+### Export diagnostics to the HA share (Bridge 0.5.1-beta.4)
+
+Enable both options, save, and restart **the Bridge app** when the device is idle:
+
+```yaml
+diagnostics_enabled: true
+diagnostics_export_to_share: true
+```
+
+New sanitized records are also exported continuously to
+`/share/braumeister-bridge-diagnostics.jsonl`. The app mounts `share:rw`.
+With the HA Samba share this is
+`\\homeassistant.local\share\braumeister-bridge-diagnostics.jsonl` on Windows.
+`/data` belongs to the app container and is not the Samba share.
+Existing private `/data` records are not copied retroactively.
+
+The export rotates at 1 MiB to `braumeister-bridge-diagnostics.previous.jsonl`.
+Both files together retain at most 2 MiB; the previous export is replaced on
+the next rotation. Copy both files soon after a test to preserve the sequence.
+Export continues even when the legacy private file is full. Disabling export
+stops new writes and leaves existing files in place. The loopback health API
+reports `diagnostics_export_path`, `diagnostics_export_written` and
+`diagnostics_export_missed` (counters reset on restart). A busy writer skips
+both outputs and increments `diagnostics_missed`; sequence gaps remain visible.
+Export failures never interrupt device/cloud forwarding. Anyone with access
+to the share can read these sanitized records.
+
+### Capturing button mappings
+
+Capture one Braumeister at a time: device identities are deliberately omitted.
+For each test record the local time/time zone, screen/phase, displayed button
+labels, the button pressed, and whether it was pressed in MySpeidel, HA, or on
+the physical device. Include the target before and after and a screenshot of
+the editor. Keep exchanges before and after the action. A record describes
+the incoming device state and the keys returned **in that response**; the effect
+appears in later records. Physical presses have no cloud `$k` command.
+
+Fields 13/15 help recognize an editor but do not prove Up/Down/Select mappings.
+Rest and boil editors still require real observations. For MySpeidel button
+tests, cloud forwarding must be enabled; otherwise those commands cannot be
+observed by the Bridge. Recording/export does not enable control permissions
+or issue commands. Firmware/app versions and action notes belong with the
+capture; raw packets and credentials are not required for the initial analysis.
 
 With `control_enabled: true`, local API clients can POST JSON containing
 `device_id` and `action` to `/api/control`. Supported actions:
