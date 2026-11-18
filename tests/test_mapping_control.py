@@ -12,6 +12,8 @@ def message(screen, labels, indicator="000", target="380", delay="0", flags="ph"
 
 
 @pytest.mark.parametrize("action,before,after,key,result", [
+    ("confirm_water_filled", (2030,"ADUS"), (2300,"A000","000","380","0","Ph"), 4, "confirmed"),
+    ("cancel_water_prompt", (2030,"ADUS"), (101,"EMSR"), 1, "confirmed"),
     ("start_now", (2120,"A00S","000","380","3531"), (2300,"A000","000","380","0","Ph"), 4, "confirmed"),
     ("open_temperature_editor", (4006,"APHT"), (4007,"ADUS","00T"), 4, "confirmed"),
     ("temperature_up", (4007,"ADUS","00T"), (4007,"ADUS","00T","390"), 3, "confirmed"),
@@ -21,6 +23,7 @@ def message(screen, labels, indicator="000", target="380", delay="0", flags="ph"
     ("start_delay_up", (2030,"ADUS"), (2111,"ADUS"), 3, "confirmed"),
     ("start_delay_up", (2111,"ADUS"), (2111,"ADUS"), 3, "unconfirmed"),
     ("start_delay_down", (2111,"ADUS"), (2111,"ADUS"), 2, "unconfirmed"),
+    ("confirm_start_delay", (2111,"ADUS"), (2300,"A000","000","380","0","Ph"), 4, "confirmed"),
     ("confirm_start_delay", (2111,"ADUS"), (2120,"A00S","000","380","3599"), 4, "confirmed"),
     ("cancel_water_prompt", (2111,"ADUS"), (101,"EMSR"), 1, "confirmed"),
     ("cancel_start_delay", (2120,"A00S","000","380","3397"), (101,"EMSR"), 1, "confirmed"),
@@ -36,7 +39,7 @@ async def test_mapping_exchange(bridge_module, action, before, after, key, resul
             return await api.post('/api/control', json={'device_id':DEVICE, 'action':action})
         try:
             await poll(before)
-            if action in ('confirm_start_delay', 'start_now'):
+            if action in ('confirm_start_delay', 'start_now', 'confirm_water_filled'):
                 assert (await queue()).status == 403
                 bridge.options['program_control_enabled'] = True
                 assert (await queue()).status == 403
@@ -61,7 +64,7 @@ async def test_mapping_exchange(bridge_module, action, before, after, key, resul
     ('start_now',(2120,'A00S','000','380','-1')),
     ('start_now',(2120,'A00S','120','380','3531')),
     ('start_now',(2120,'A00S','000','380','3531','Ph')),
-    ('start_delay_down',(2030,'ADUS')), ('cancel_water_prompt',(2030,'ADUS')),
+    ('start_delay_down',(2030,'ADUS')), ('confirm_water_filled',(2111,'ADUS')),
     ('confirm_start_delay',(2120,'A00S')), ('temperature_up',(101,'EMSR','00T')),
     ('temperature_up',(4007,'ADUS','000')), ('temperature_up',(4007,'ADUS','00T','380','0','PH')),
     ('start_delay_up',(2111,'A000')), ('cancel_start_delay',(2120,'A00S','120')),

@@ -87,13 +87,13 @@ LOCAL_ACTIONS = {
     "recipe_up": ("2015", "2015", b"$k=3"),
     "select_recipe": ("2015", "2030", b"$k=4"),
 }
-PROGRAM_KEYS = {"request_program_pause": b"$k=1", "abort_program": b"$k=1", "resume_program": b"$k=4"}
+PROGRAM_KEYS = {"acknowledge_mash_temperature": b"$k=4", "open_malt_confirmation": b"$k=4", "confirm_malt_added": b"$k=4", "request_program_pause": b"$k=1", "abort_program": b"$k=1", "resume_program": b"$k=4"}
 MAPPING_KEYS = {
     "open_temperature_editor": 4, "temperature_up": 3, "temperature_down": 2,
     "confirm_temperature": 4, "cancel_temperature": 1,
     "start_delay_up": 3, "start_delay_down": 2, "confirm_start_delay": 4,
     "cancel_water_prompt": 1, "cancel_start_delay": 1,
-    "start_now": 4,
+    "start_now": 4, "confirm_water_filled": 4,
 }
 
 
@@ -127,8 +127,10 @@ def mapping_rule(action, payload):
                 return None  # Down from zero has not been observed.
             targets = {3: "2111", 13: "ADUS", 15: "000"}
             unverified = screen == "2111"  # Same screen cannot confirm a hidden value change.
-        elif action == "cancel_water_prompt" and screen == "2111":
+        elif action == "cancel_water_prompt":
             targets = {3: "101", 13: "EMSR", 15: "000"}
+        elif action == "confirm_water_filled" and screen == "2030":
+            targets = {3: "2300", 13: "A000", 14: "Ph", 15: "000", 17: "0"}
         elif action == "confirm_start_delay" and screen == "2111":
             targets = {3: "2120", 13: "A00S", 15: "000"}
     elif action == "cancel_start_delay" and (screen, labels, indicator) == ("2120", "A00S", "000"):
@@ -150,11 +152,19 @@ def mapping_matches(payload, expected):
 
 def program_transition(action, screen, flags, indicator):
     """Only individually evidenced stages; a pause is not a final abort."""
+    if action == "acknowledge_mash_temperature" and (screen, flags, indicator) == ("2510", "Pi", "010"):
+        return "2610", ("ph",), "000"
+    if action == "open_malt_confirmation" and (screen, flags, indicator) == ("2610", "ph", "000"):
+        return "2705", ("ph",), "000"
+    if action == "confirm_malt_added" and (screen, flags, indicator) == ("2705", "ph", "000"):
+        return "2810", ("PH",), "000"
+    if action == "request_program_pause" and screen in ("2510", "2610", "2705", "2810", "2820") and indicator in ("000", "010") and flags in {"ph", "Ph", "pH", "PH", "pi", "Pi", "qh", "qH", "qi"}:
+        return screen, ("ph",), "120"
     if action == "request_program_pause" and indicator == "000":
-        permitted = {"2300": {"ph", "Ph"}, "2410": {"ph", "Ph", "pH", "PH", "pi", "Pi", "qh", "qH", "qi"}}
+        permitted = {"2300": {"ph", "Ph"}, "2310": {"ph", "Ph"}, "2410": {"ph", "Ph", "pH", "PH", "pi", "Pi", "qh", "qH", "qi"}}
         if flags in permitted.get(screen, set()):
             return screen, ("ph",), "120"
-    if action == "abort_program" and screen in ("2300", "2410") and (flags, indicator) == ("ph", "120"):
+    if action == "abort_program" and screen in ("2300", "2310", "2410", "2510", "2610", "2705", "2810", "2820") and (flags, indicator) == ("ph", "120"):
         return "101", ("ph",), "000"
     if action == "resume_program" and (screen, flags, indicator) == ("2300", "ph", "120"):
         return "2300", ("Ph",), "000"
@@ -535,12 +545,14 @@ class Bridge:
             command = None
         if command and command["result"] == "sent":
             screen, flags, slot, count = self.control_screen(message[1], device.get("rz", ""))
-            if screen == control_transition(command)[1] and flags in command["target_flags"] and (
+            zero_delay_start = command["action"] == "confirm_start_delay" and mapping_matches(
+                message[1], {3: "2300", 13: "A000", 14: "Ph", 15: "000", 17: "0"})
+            if zero_delay_start or (screen == control_transition(command)[1] and flags in command["target_flags"] and (
                 command["target_slot"] is None
                 or (command["target_slot"], command["recipe_count"]) == (slot, count)
             ) and (command.get("target_indicator") is None
                    or self.control_indicator(message[1]) == command["target_indicator"]) and (
-                       not command.get("mapping") or mapping_matches(message[1], command["mapping"]["targets"])):
+                       not command.get("mapping") or mapping_matches(message[1], command["mapping"]["targets"]))):
                 command["result"] = "unconfirmed" if (command.get("mapping") or {}).get("unverified") else "confirmed"
 
         status, headers, answer, source = 200, {"Content-Type": "text/plain; charset=UTF-8"}, LOCAL_ANSWER, "local"
@@ -567,9 +579,9 @@ class Bridge:
             action = command["action"]
             if action in ACTUATOR_OPTIONS and self.options.get(ACTUATOR_OPTIONS[action]) is not True:
                 command["result"] = "state_changed"
-            elif action == "resume_program" and not self.program_resume_allowed():
+            elif action in ("resume_program", "confirm_malt_added") and not self.program_resume_allowed():
                 command["result"] = "state_changed"
-            elif action in ("confirm_start_delay", "start_now") and not self.program_resume_allowed():
+            elif action in ("confirm_start_delay", "start_now", "confirm_water_filled") and not self.program_resume_allowed():
                 command["result"] = "state_changed"
             elif command.get("mapping") and (not mapping_matches(message[1], command["mapping"]["guard"])
                                               or mapping_rule(action, message[1]) is None):
@@ -848,15 +860,15 @@ class Bridge:
         source_indicator = target_indicator = target_screen = None
         mapping = None
         if action in MAPPING_KEYS:
-            if action in ("confirm_start_delay", "start_now") and not self.program_resume_allowed():
+            if action in ("confirm_start_delay", "start_now", "confirm_water_filled") and not self.program_resume_allowed():
                 raise web.HTTPForbidden(text="Delayed start requires program_control_enabled and allow_remote_heating")
             mapping = mapping_rule(action, device.get("bm_stat", ""))
             if mapping is None:
                 raise web.HTTPConflict(text="Unverified editor state, flags, unit or value")
             target_screen = mapping["targets"][3]
-            target_flags = ("Ph",) if action == "start_now" else ("ph",)
+            target_flags = ("Ph",) if action in ("start_now", "confirm_water_filled") else ("ph",)
         elif action in PROGRAM_KEYS:
-            if action == "resume_program" and not self.program_resume_allowed():
+            if action in ("resume_program", "confirm_malt_added") and not self.program_resume_allowed():
                 raise web.HTTPForbidden(text="Program resume requires program_control_enabled and allow_remote_heating")
             source_indicator = self.control_indicator(device.get("bm_stat", ""))
             transition = program_transition(action, screen, flags, source_indicator)

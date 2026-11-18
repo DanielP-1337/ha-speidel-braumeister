@@ -1,3 +1,5 @@
+> New: [Direct start and alarm notifications](docs/direct-start-and-alarm-beta.md).
+
 > New: [Start now beta](docs/start-now-beta.md).
 
 > New hardware-mapping beta: [versions, installation and test guide](docs/mapping-beta.md).

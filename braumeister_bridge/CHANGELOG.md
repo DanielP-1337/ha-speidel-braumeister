@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.1-beta.7
+
+- Map the three captured mash-in Select transitions and expose pause/abort in the corresponding prompts and first-rest states.
+- Recognize direct start after confirming a zero-delay selection.
+
+- Add initial water-prompt Cancel and direct confirmed start, with existing start/heating permissions.
+- Route Cancel during pump-pause state 2310 without requiring a heating permission.
+- Retain fresh-context revalidation, pause/final-abort distinction and no automatic key retries.
+- New paths require hardware validation; audio/Hue configuration belongs to the card/HA automation.
+
+
 ## 0.5.1-beta.6
 
 - Add guarded countdown Start now based on the observed key-4 transition to pump purging.
