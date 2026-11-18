@@ -87,7 +87,7 @@ LOCAL_ACTIONS = {
     "recipe_up": ("2015", "2015", b"$k=3"),
     "select_recipe": ("2015", "2030", b"$k=4"),
 }
-PROGRAM_KEYS = {"acknowledge_mash_temperature": b"$k=4", "open_malt_confirmation": b"$k=4", "confirm_malt_added": b"$k=4", "request_program_pause": b"$k=1", "abort_program": b"$k=1", "resume_program": b"$k=4"}
+PROGRAM_KEYS = {"confirm_lid_removed": b"$k=4", "acknowledge_rest_end": b"$k=4", "confirm_malt_pipe_removed": b"$k=4", "start_boil": b"$k=4", "acknowledge_mash_temperature": b"$k=4", "open_malt_confirmation": b"$k=4", "confirm_malt_added": b"$k=4", "request_program_pause": b"$k=1", "abort_program": b"$k=1", "resume_program": b"$k=4"}
 MAPPING_KEYS = {
     "open_temperature_editor": 4, "temperature_up": 3, "temperature_down": 2,
     "confirm_temperature": 4, "cancel_temperature": 1,
@@ -152,6 +152,20 @@ def mapping_matches(payload, expected):
 
 def program_transition(action, screen, flags, indicator):
     """Only individually evidenced stages; a pause is not a final abort."""
+    if action == "confirm_lid_removed" and (screen, flags, indicator) == ("3010", "qH", "0DT"):
+        return "3010", ("qH",), "00T"
+    if action == "acknowledge_rest_end" and (screen, flags, indicator) == ("2910", "Pi", "010"):
+        return "2930", ("pi",), "000"
+    if action == "confirm_malt_pipe_removed" and screen == "2930" and flags in {"pi", "pH"} and indicator == "000":
+        return "2960", ("pi", "pH"), "000"
+    if action == "start_boil" and screen == "2960" and flags in {"pi", "pH"} and indicator == "000":
+        return "3010", ("PH",), "000"
+    # Same stop handshake as the earlier brewing stages; retain exact target
+    # confirmation and do not treat requesting a pause as a permanent abort.
+    if action == "request_program_pause" and screen in ("2910", "2930", "2960") and indicator == ("010" if screen == "2910" else "000") and flags in {"ph", "Ph", "pH", "PH", "pi", "Pi", "qh", "qH", "qi"}:
+        return screen, ("ph",), "120"
+    if action == "abort_program" and screen in ("2910", "2930", "2960") and (flags, indicator) == ("ph", "120"):
+        return "101", ("ph",), "000"
     if action == "acknowledge_mash_temperature" and (screen, flags, indicator) == ("2510", "Pi", "010"):
         return "2610", ("ph",), "000"
     if action == "open_malt_confirmation" and (screen, flags, indicator) == ("2610", "ph", "000"):
@@ -872,7 +886,7 @@ class Bridge:
             target_screen = mapping["targets"][3]
             target_flags = ("Ph",) if action in ("start_now", "confirm_water_filled") else ("ph",)
         elif action in PROGRAM_KEYS:
-            if action in ("resume_program", "confirm_malt_added") and not self.program_resume_allowed():
+            if action in ("resume_program", "confirm_malt_added", "start_boil") and not self.program_resume_allowed():
                 raise web.HTTPForbidden(text="Program resume requires program_control_enabled and allow_remote_heating")
             source_indicator = self.control_indicator(device.get("bm_stat", ""))
             transition = program_transition(action, screen, flags, source_indicator)
