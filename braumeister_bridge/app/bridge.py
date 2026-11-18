@@ -152,6 +152,14 @@ def mapping_matches(payload, expected):
 
 def program_transition(action, screen, flags, indicator):
     """Only individually evidenced stages; a pause is not a final abort."""
+    if action == "request_program_pause" and (screen, flags, indicator) == ("3080", "qH", "010"):
+        return "3080", ("ph",), "120"
+    if action == "resume_program" and (screen, flags, indicator) == ("3080", "ph", "120"):
+        return "3080", ("qH",), "010"
+    if action == "confirm_lid_removed" and (screen, flags, indicator) == ("3010", "qH", "0D0"):
+        return "3010", ("qH",), "000"
+    if action == "resume_program" and (screen, flags, indicator) == ("2820", "ph", "120"):
+        return "2820", ("PH",), "000"
     if action == "acknowledge_hop_addition" and (screen, flags, indicator) == ("3080", "qH", "010"):
         return "3070", ("qH",), "000"
     if action == "confirm_whirlpool" and (screen, flags, indicator) == ("3510", "ph", "000"):
