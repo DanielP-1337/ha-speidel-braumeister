@@ -108,4 +108,3 @@ async def test_local_control_through_device_poll(bridge_module):
                     assert await result() == "confirmed"
             finally:
                 await bridge.close_session()
-

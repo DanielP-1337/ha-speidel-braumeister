@@ -130,4 +130,3 @@ async def test_manual_actuator_control_through_device_poll(bridge_module):
                 assert (await enqueue("heater_off")).status == 409
             finally:
                 await bridge.close_session()
-
