@@ -15,6 +15,10 @@ def body(state, flags="ph", indicator="000", slot="0", count="5"):
 
 
 @pytest.mark.parametrize(("action", "before", "flags", "indicator", "after", "target_flags", "target_indicator", "key"), [
+    ("request_program_pause", "3080", "qH", "010", "3080", "ph", "120", 1),
+    ("resume_program", "3080", "ph", "120", "3080", "qH", "010", 4),
+    ("resume_program", "2820", "ph", "120", "2820", "PH", "000", 4),
+    ("confirm_lid_removed", "3010", "qH", "0D0", "3010", "qH", "000", 4),
     ("acknowledge_hop_addition", "3080", "qH", "010", "3070", "qH", "000", 4),
     ("confirm_whirlpool", "3510", "ph", "000", "3610", "ph", "000", 4),
     ("finish_brewing", "3610", "ph", "000", "101", "ph", "000", 4),
@@ -121,7 +125,9 @@ async def test_exact_program_exchange_and_indicator_confirmation(
     ("resume_program", "2310", "Ph", "120"),
     ("resume_program", "2810", "ph", "000"),
     ("resume_program", "2810", "PH", "120"),
-    ("resume_program", "2820", "ph", "120"),
+    ("resume_program", "2820", "PH", "120"),
+    ("resume_program", "2820", "ph", "000"),
+    ("confirm_lid_removed", "3010", "PH", "0D0"),
     ("abort_program", "2410", "ph", "000"),
     ("abort_program", "2030", "ph", "120"),
     ("request_program_pause", "2310", "ph", "120"),
