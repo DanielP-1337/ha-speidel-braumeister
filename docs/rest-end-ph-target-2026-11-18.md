@@ -26,5 +26,5 @@ for a different source state.
 
 Validation includes a simulated end-to-end exchange confirming the pH target
 only with the correct indicator, and a negative test retaining qi rejection.
-This source change awaits the next beta release and HA hardware validation.
+This change is packaged in Bridge 0.5.1-beta.15; HA hardware validation is pending.
 No device commands, raw diagnostics, or upstream PR are part of this change.

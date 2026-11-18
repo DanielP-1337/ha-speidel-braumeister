@@ -21,5 +21,6 @@ The final-abort transition was already supported and is reconfirmed here.
 No resume transition from this qH-origin pause was captured; do not infer a new
 resume target. Editor contexts and other actuator combinations are unchanged.
 Synthetic exchange and adapter tests cover qH/000 acceptance and rejection of
-qH/00T and qi/000. New HA-path hardware validation and the next release remain
-pending. No raw captures, device identifiers, or upstream PR are published.
+qH/00T and qi/000. Packaged in Bridge 0.5.1-beta.15 and Companion 0.1.0-beta.24;
+new HA-path hardware validation remains pending. No raw captures, device
+identifiers, or upstream PR are published.
