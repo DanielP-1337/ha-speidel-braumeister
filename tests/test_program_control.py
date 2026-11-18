@@ -15,6 +15,9 @@ def body(state, flags="ph", indicator="000", slot="0", count="5"):
 
 
 @pytest.mark.parametrize(("action", "before", "flags", "indicator", "after", "target_flags", "target_indicator", "key"), [
+    ("acknowledge_brew_complete", "3450", "ph", "010", "3510", "ph", "000", 4),
+    ("request_program_pause", "3450", "ph", "010", "3450", "ph", "120", 1),
+    ("resume_program", "3450", "ph", "120", "3450", "ph", "010", 4),
     ("request_program_pause", "3080", "qH", "010", "3080", "ph", "120", 1),
     ("resume_program", "3080", "ph", "120", "3080", "qH", "010", 4),
     ("resume_program", "2820", "ph", "120", "2820", "PH", "000", 4),
@@ -103,6 +106,9 @@ async def test_exact_program_exchange_and_indicator_confirmation(
 
 
 @pytest.mark.parametrize(("action", "screen", "flags", "indicator"), [
+    ("acknowledge_brew_complete", "3450", "ph", "120"),
+    ("acknowledge_brew_complete", "3450", "PH", "010"),
+    ("acknowledge_brew_complete", "3510", "ph", "000"),
     ("acknowledge_hop_addition", "3080", "qH", "120"),
     ("acknowledge_hop_addition", "3080", "qH", "000"),
     ("acknowledge_hop_addition", "3080", "PH", "010"),
