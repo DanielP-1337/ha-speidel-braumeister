@@ -8,6 +8,20 @@ from conftest import device_protocol
 brew_display = importlib.import_module('protocol_tests.brew_display').brew_display
 
 
+def test_live_boil_target_after_time_editor_confirmation():
+    data = fields(3010)
+    data[6:8] = ['720', '0']
+    decoded = brew_display(data)
+    assert decoded['display_time_target_seconds'] == 720
+    assert decoded['display_time_elapsed_seconds'] == 0
+    data[6] = '180'
+    assert brew_display(data)['display_time_target_seconds'] == 180
+    data[6] = 'bad'
+    assert brew_display(data)['display_time_target_seconds'] is None
+    data[3] = '2930'
+    assert brew_display(data)['display_time_elapsed_seconds'] is None
+
+
 @pytest.mark.parametrize('code,value,expected', [(2120,'3599',3599),(2120,'0',0),
     (2120,'-1',None),(2120,'NaN',None),(2120,'1.5',None),(2111,'3599',None),(101,'3599',None)])
 def test_start_delay_seconds(code,value,expected):

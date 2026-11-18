@@ -15,6 +15,16 @@ def body(state, flags="ph", indicator="000", slot="0", count="5"):
 
 
 @pytest.mark.parametrize(("action", "before", "flags", "indicator", "after", "target_flags", "target_indicator", "key"), [
+    ("confirm_lid_removed", "3010", "qH", "0DT", "3010", "qH", "00T", 4),
+    ("acknowledge_rest_end", "2910", "Pi", "010", "2930", "pi", "000", 4),
+    ("confirm_malt_pipe_removed", "2930", "pH", "000", "2960", "pH", "000", 4),
+    ("start_boil", "2960", "pi", "000", "3010", "PH", "000", 4),
+    ("request_program_pause", "2910", "Pi", "010", "2910", "ph", "120", 1),
+    ("request_program_pause", "2930", "pH", "000", "2930", "ph", "120", 1),
+    ("request_program_pause", "2960", "pi", "000", "2960", "ph", "120", 1),
+    ("abort_program", "2910", "ph", "120", "101", "ph", "000", 1),
+    ("abort_program", "2930", "ph", "120", "101", "ph", "000", 1),
+    ("abort_program", "2960", "ph", "120", "101", "ph", "000", 1),
     ("request_program_pause", "2310", "ph", "000", "2310", "ph", "120", 1),
     ("abort_program", "2310", "ph", "120", "101", "ph", "000", 1),
     ("acknowledge_mash_temperature", "2510", "Pi", "010", "2610", "ph", "000", 4),
@@ -57,7 +67,7 @@ async def test_exact_program_exchange_and_indicator_confirmation(
             try:
                 await poll(before, flags, indicator)
                 bridge.devices[DEVICE]["rz"] = "FW;TEST;1;4\r\n0X1\r\n1X1\r\n2X1\r\n3X1;0;0"
-                if action in ("resume_program", "confirm_malt_added"):
+                if action in ("resume_program", "confirm_malt_added", "start_boil"):
                     assert (await queue()).status == 403
                     bridge.options["program_control_enabled"] = True
                     assert (await queue()).status == 403
@@ -86,6 +96,13 @@ async def test_exact_program_exchange_and_indicator_confirmation(
 
 
 @pytest.mark.parametrize(("action", "screen", "flags", "indicator"), [
+    ("start_boil", "2960", "pi", "00T"),
+    ("start_boil", "3010", "PH", "000"),
+    ("confirm_lid_removed", "3010", "qH", "000"),
+    ("confirm_lid_removed", "3010", "qH", "00T"),
+    ("confirm_lid_removed", "3010", "PH", "0DT"),
+    ("acknowledge_rest_end", "2910", "Pi", "120"),
+    ("confirm_malt_pipe_removed", "2930", "pH", "120"),
     ("resume_program", "2410", "ph", "120"),
     ("resume_program", "2300", "ph", "000"),
     ("resume_program", "2300", "PH", "120"),

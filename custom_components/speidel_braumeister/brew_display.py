@@ -81,7 +81,7 @@ def brew_display(fields):
     actuators = field(14)
     valid_flags = (len(actuators) == 2 and actuators[0] in ("P", "p", "q")
                    and actuators[1] in ("H", "h", "i"))
-    timed = code is not None and 2810 <= code < 2910
+    timed = code is not None and (2810 <= code < 2910 or code == 3010)
     target_seconds, elapsed_seconds = number(6), number(7)
     delay = number(17)
     delay_valid = (code == 2120 and field(13) == "A00S" and flags == "000"
