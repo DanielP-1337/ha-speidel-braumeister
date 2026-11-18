@@ -152,7 +152,7 @@ def mapping_matches(payload, expected):
 
 def program_transition(action, screen, flags, indicator):
     """Only individually evidenced stages; a pause is not a final abort."""
-    if action == "request_program_pause" and (screen, flags, indicator) == ("3010", "PH", "000"):
+    if action == "request_program_pause" and screen == "3010" and flags in {"PH", "qH"} and indicator == "000":
         return "3010", ("ph",), "120"
     if action == "request_program_pause" and (screen, flags, indicator) == ("3010", "qH", "0D0"):
         return "3010", ("ph",), "120"
