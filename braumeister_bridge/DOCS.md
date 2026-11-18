@@ -195,8 +195,10 @@ water prompt. It validates the selected slot against field 8's recipe count.
 `abort_program` is available only from the matching pause dialog. These actions
 require `control_enabled`. `resume_program` is limited to the purge pause and
 additionally requires both `program_control_enabled: true` (default false) and
-`allow_remote_heating: true`. Water confirmation, delayed start, state 2310 and
-heating-stage resume are unsupported. Commands are checked again before sending;
+`allow_remote_heating: true`. As of 0.5.1-beta.8, Resume is supported from
+2300/ph/120, 2310/ph/120, and 2810/ph/120. Heating-stage resume remains
+unsupported. Water confirmation and delayed start use separately guarded actions.
+Commands are checked again before sending;
 a changed dialog cancels the queued command. First Cancel pauses, second Cancel
 from the pause dialog ends the program.
 

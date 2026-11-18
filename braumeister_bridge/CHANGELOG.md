@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1-beta.8
+
+- Allow guarded Resume in the observed 2310 purge intermediate pause and 2810 first-rest pause.
+- Confirm the exact actuator/indicator transition after sending one Select key. All existing permissions and freshness checks remain.
+- See docs/hardware-findings-2026-11-18.md for hardware evidence and remaining mapping gaps.
+
 ## 0.5.1-beta.7
 
 - Map the three captured mash-in Select transitions and expose pause/abort in the corresponding prompts and first-rest states.

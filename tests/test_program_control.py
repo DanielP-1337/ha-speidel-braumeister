@@ -28,6 +28,8 @@ def body(state, flags="ph", indicator="000", slot="0", count="5"):
     ("abort_program", "2300", "ph", "120", "101", "ph", "000", 1),
     ("abort_program", "2410", "ph", "120", "101", "ph", "000", 1),
     ("resume_program", "2300", "ph", "120", "2300", "Ph", "000", 4),
+    ("resume_program", "2310", "ph", "120", "2310", "ph", "000", 4),
+    ("resume_program", "2810", "ph", "120", "2810", "PH", "000", 4),
 ])
 async def test_exact_program_exchange_and_indicator_confirmation(
         bridge_module, action, before, flags, indicator, after, target_flags, target_indicator, key):
@@ -87,6 +89,11 @@ async def test_exact_program_exchange_and_indicator_confirmation(
     ("resume_program", "2410", "ph", "120"),
     ("resume_program", "2300", "ph", "000"),
     ("resume_program", "2300", "PH", "120"),
+    ("resume_program", "2310", "ph", "000"),
+    ("resume_program", "2310", "Ph", "120"),
+    ("resume_program", "2810", "ph", "000"),
+    ("resume_program", "2810", "PH", "120"),
+    ("resume_program", "2820", "ph", "120"),
     ("abort_program", "2410", "ph", "000"),
     ("abort_program", "2030", "ph", "120"),
     ("request_program_pause", "2310", "ph", "120"),

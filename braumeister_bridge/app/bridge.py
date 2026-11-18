@@ -168,6 +168,10 @@ def program_transition(action, screen, flags, indicator):
         return "101", ("ph",), "000"
     if action == "resume_program" and (screen, flags, indicator) == ("2300", "ph", "120"):
         return "2300", ("Ph",), "000"
+    if action == "resume_program" and (screen, flags, indicator) == ("2310", "ph", "120"):
+        return "2310", ("ph",), "000"
+    if action == "resume_program" and (screen, flags, indicator) == ("2810", "ph", "120"):
+        return "2810", ("PH",), "000"
     return None
 
 
