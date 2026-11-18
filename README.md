@@ -1,3 +1,6 @@
+> **HA App Store beta channel:** [Installation, updates and migration](docs/app-store-beta.md).
+> Repository URL: `https://github.com/DanielP-1337/ha-speidel-braumeister#beta`
+
 > New: [Direct start and alarm notifications](docs/direct-start-and-alarm-beta.md).
 
 > New: [Start now beta](docs/start-now-beta.md).
