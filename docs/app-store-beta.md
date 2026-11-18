@@ -12,9 +12,9 @@ Install **Braumeister Bridge (Beta)** from **Braumeister Bridge — Beta**.
 This channel initially contains the tested Bridge 0.5.1-beta.7 runtime from
 integration release 3.2.1-beta.9. The channel now includes Bridge 0.5.1-beta.8
 from tested integration release 3.2.1-beta.10 (verified resume contexts).
-The current update is Bridge 0.5.1-beta.14 from tested release 3.2.1-beta.16,
-adding normal lid-warning Cancel, final abort from the heating-stage pause,
-and the observed qi hot-start acknowledgment, plus the preceding control fixes.
+The current update is Bridge 0.5.1-beta.15 from tested release 3.2.1-beta.17,
+adding normal heating-to-boil pause with qH/000 and the observed pH target after
+rest-end acknowledgment from Pi. Rest-end source qi remains unverified and rejected.
 Only the App Store name and links differ from the corresponding release.
 The Supervisor builds the AMD64/ARM64 app using the supplied build.yaml;
 updates are subsequently offered in the app's Info page when this channel

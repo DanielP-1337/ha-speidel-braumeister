@@ -17,6 +17,7 @@ def body(state, flags="ph", indicator="000", slot="0", count="5"):
 @pytest.mark.parametrize(("action", "before", "flags", "indicator", "after", "target_flags", "target_indicator", "key"), [
     ("acknowledge_rest_end", "2910", "PH", "010", "2930", "pi", "000", 4),
     ("request_program_pause", "3010", "PH", "000", "3010", "ph", "120", 1),
+    ("request_program_pause", "3010", "qH", "000", "3010", "ph", "120", 1),
     ("request_program_pause", "3010", "qH", "0D0", "3010", "ph", "120", 1),
     ("abort_program", "3010", "ph", "120", "101", "ph", "000", 1),
     ("resume_program", "3010", "ph", "120", "3010", "PH", "000", 4),
@@ -32,6 +33,7 @@ def body(state, flags="ph", indicator="000", slot="0", count="5"):
     ("finish_brewing", "3610", "ph", "000", "101", "ph", "000", 4),
     ("confirm_lid_removed", "3010", "qH", "0DT", "3010", "qH", "00T", 4),
     ("acknowledge_rest_end", "2910", "Pi", "010", "2930", "pi", "000", 4),
+    ("acknowledge_rest_end", "2910", "Pi", "010", "2930", "pH", "000", 4),
     ("confirm_malt_pipe_removed", "2930", "pH", "000", "2960", "pH", "000", 4),
     ("start_boil", "2960", "pi", "000", "3010", "PH", "000", 4),
     ("request_program_pause", "2910", "Pi", "010", "2910", "ph", "120", 1),
@@ -113,6 +115,8 @@ async def test_exact_program_exchange_and_indicator_confirmation(
 
 @pytest.mark.parametrize(("action", "screen", "flags", "indicator"), [
     ("request_program_pause", "3010", "PH", "00T"),
+    ("request_program_pause", "3010", "qH", "00T"),
+    ("request_program_pause", "3010", "qi", "000"),
     ("acknowledge_mash_temperature", "2510", "qi", "000"),
     ("acknowledge_mash_temperature", "2510", "qH", "010"),
     ("request_program_pause", "3010", "qH", "0DT"),
@@ -139,6 +143,7 @@ async def test_exact_program_exchange_and_indicator_confirmation(
     ("confirm_lid_removed", "3010", "qH", "00T"),
     ("confirm_lid_removed", "3010", "PH", "0DT"),
     ("acknowledge_rest_end", "2910", "Pi", "120"),
+    ("acknowledge_rest_end", "2910", "qi", "010"),
     ("confirm_malt_pipe_removed", "2930", "pH", "120"),
     ("resume_program", "2410", "ph", "120"),
     ("resume_program", "2300", "ph", "000"),

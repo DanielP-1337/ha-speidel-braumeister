@@ -152,7 +152,7 @@ def mapping_matches(payload, expected):
 
 def program_transition(action, screen, flags, indicator):
     """Only individually evidenced stages; a pause is not a final abort."""
-    if action == "request_program_pause" and (screen, flags, indicator) == ("3010", "PH", "000"):
+    if action == "request_program_pause" and screen == "3010" and flags in {"PH", "qH"} and indicator == "000":
         return "3010", ("ph",), "120"
     if action == "request_program_pause" and (screen, flags, indicator) == ("3010", "qH", "0D0"):
         return "3010", ("ph",), "120"
@@ -183,7 +183,7 @@ def program_transition(action, screen, flags, indicator):
     if action == "confirm_lid_removed" and (screen, flags, indicator) == ("3010", "qH", "0DT"):
         return "3010", ("qH",), "00T"
     if action == "acknowledge_rest_end" and screen == "2910" and flags in {"PH", "Pi"} and indicator == "010":
-        return "2930", ("pi",), "000"
+        return "2930", ("pi", "pH") if flags == "Pi" else ("pi",), "000"
     if action == "confirm_malt_pipe_removed" and screen == "2930" and flags in {"pi", "pH"} and indicator == "000":
         return "2960", ("pi", "pH"), "000"
     if action == "start_boil" and screen == "2960" and flags in {"pi", "pH"} and indicator == "000":
