@@ -46,3 +46,31 @@ must remain distinct in the UI.
 
 - [x] Lid warning: cloud Select at sequence 3374 (`3010/qH/0DT`, `ADUS`) → 3376 (`3010/qH/00T`, `A00S`). The editor flag remains T; do not assume this is normal `000` or a generic Resume.
 - [ ] Verify Cancel and Up/Down at the lid warning; these remain unavailable in HA.
+
+## Hop acknowledgment and end-of-brew follow-up
+
+User reported that the hop prompt, brewing-complete screen and Whirlpool still
+have unavailable controls in HA. These are not enabled by beta.27.
+
+- [x] Third hop addition: cloud key 4 at sequence 4262, `3080/qH/010`
+  (`A00S`, hop index 2) → sequence 4264, `3070/qH/000` (`A00S`, hop index -1).
+  The elapsed value advanced from 178 to 179 seconds against a 180-second target.
+- [x] The next captured state was `3450/ph/010` at sequence 4268, followed by
+  `3510/ph/000` at sequence 4330. No key event was present between these states
+  in this export; do not label that transition a confirmed Select command.
+- [x] Cloud key 4 at sequence 4382, `3510/ph/000` (`000S`) → sequence 4384,
+  `3610/ph/000` (`000S`).
+- [x] Implement and test the exact hop-acknowledgment action in Bridge, Companion and Card (beta.28 / Companion beta.18 / Bridge beta.10).
+- [x] Final Cheers screen: cloud key 4 at sequence 4464, `3610/ph/000`
+  (`000S`) → sequence 4466, main menu `101/ph/000` (`EMSR`). The user
+  confirmed both Whirlpool and Cheers through MySpeidel because HA Select
+  was still unavailable.
+- [x] Implement and test the recorded 3510 → 3610 and 3610 → 101 confirmations.
+  Use field 13 to distinguish screens with only Select; do not add Cancel or
+  Up/Down to these two completion screens.
+- [ ] Validate the three new HA actions on hardware after updating the coordinated beta set. The source transitions above were observed through MySpeidel; automated tests use simulated device responses.
+- [ ] Verify stopping behavior at hop/end-of-brew prompts; do not infer a Cancel
+  action from a Select trace.
+
+The same recording also contains the user's deliberate temperature/time editing
+experiments. Those editor key presses are separate from these prompt confirmations.

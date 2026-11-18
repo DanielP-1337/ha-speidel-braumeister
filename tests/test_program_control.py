@@ -15,6 +15,9 @@ def body(state, flags="ph", indicator="000", slot="0", count="5"):
 
 
 @pytest.mark.parametrize(("action", "before", "flags", "indicator", "after", "target_flags", "target_indicator", "key"), [
+    ("acknowledge_hop_addition", "3080", "qH", "010", "3070", "qH", "000", 4),
+    ("confirm_whirlpool", "3510", "ph", "000", "3610", "ph", "000", 4),
+    ("finish_brewing", "3610", "ph", "000", "101", "ph", "000", 4),
     ("confirm_lid_removed", "3010", "qH", "0DT", "3010", "qH", "00T", 4),
     ("acknowledge_rest_end", "2910", "Pi", "010", "2930", "pi", "000", 4),
     ("confirm_malt_pipe_removed", "2930", "pH", "000", "2960", "pH", "000", 4),
@@ -96,6 +99,14 @@ async def test_exact_program_exchange_and_indicator_confirmation(
 
 
 @pytest.mark.parametrize(("action", "screen", "flags", "indicator"), [
+    ("acknowledge_hop_addition", "3080", "qH", "120"),
+    ("acknowledge_hop_addition", "3080", "qH", "000"),
+    ("acknowledge_hop_addition", "3080", "PH", "010"),
+    ("acknowledge_hop_addition", "3070", "qH", "010"),
+    ("confirm_whirlpool", "3450", "ph", "010"),
+    ("confirm_whirlpool", "3510", "PH", "000"),
+    ("finish_brewing", "3510", "ph", "000"),
+    ("finish_brewing", "3610", "ph", "120"),
     ("start_boil", "2960", "pi", "00T"),
     ("start_boil", "3010", "PH", "000"),
     ("confirm_lid_removed", "3010", "qH", "000"),

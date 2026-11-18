@@ -87,7 +87,7 @@ LOCAL_ACTIONS = {
     "recipe_up": ("2015", "2015", b"$k=3"),
     "select_recipe": ("2015", "2030", b"$k=4"),
 }
-PROGRAM_KEYS = {"confirm_lid_removed": b"$k=4", "acknowledge_rest_end": b"$k=4", "confirm_malt_pipe_removed": b"$k=4", "start_boil": b"$k=4", "acknowledge_mash_temperature": b"$k=4", "open_malt_confirmation": b"$k=4", "confirm_malt_added": b"$k=4", "request_program_pause": b"$k=1", "abort_program": b"$k=1", "resume_program": b"$k=4"}
+PROGRAM_KEYS = {"acknowledge_hop_addition": b"$k=4", "confirm_whirlpool": b"$k=4", "finish_brewing": b"$k=4", "confirm_lid_removed": b"$k=4", "acknowledge_rest_end": b"$k=4", "confirm_malt_pipe_removed": b"$k=4", "start_boil": b"$k=4", "acknowledge_mash_temperature": b"$k=4", "open_malt_confirmation": b"$k=4", "confirm_malt_added": b"$k=4", "request_program_pause": b"$k=1", "abort_program": b"$k=1", "resume_program": b"$k=4"}
 MAPPING_KEYS = {
     "open_temperature_editor": 4, "temperature_up": 3, "temperature_down": 2,
     "confirm_temperature": 4, "cancel_temperature": 1,
@@ -152,6 +152,12 @@ def mapping_matches(payload, expected):
 
 def program_transition(action, screen, flags, indicator):
     """Only individually evidenced stages; a pause is not a final abort."""
+    if action == "acknowledge_hop_addition" and (screen, flags, indicator) == ("3080", "qH", "010"):
+        return "3070", ("qH",), "000"
+    if action == "confirm_whirlpool" and (screen, flags, indicator) == ("3510", "ph", "000"):
+        return "3610", ("ph",), "000"
+    if action == "finish_brewing" and (screen, flags, indicator) == ("3610", "ph", "000"):
+        return "101", ("ph",), "000"
     if action == "confirm_lid_removed" and (screen, flags, indicator) == ("3010", "qH", "0DT"):
         return "3010", ("qH",), "00T"
     if action == "acknowledge_rest_end" and (screen, flags, indicator) == ("2910", "Pi", "010"):
