@@ -154,6 +154,10 @@ def program_transition(action, screen, flags, indicator):
     """Only individually evidenced stages; a pause is not a final abort."""
     if action == "request_program_pause" and (screen, flags, indicator) == ("3010", "PH", "000"):
         return "3010", ("ph",), "120"
+    if action == "request_program_pause" and (screen, flags, indicator) == ("3010", "qH", "0D0"):
+        return "3010", ("ph",), "120"
+    if action == "abort_program" and (screen, flags, indicator) == ("3010", "ph", "120"):
+        return "101", ("ph",), "000"
     if action == "resume_program" and (screen, flags, indicator) == ("3010", "ph", "120"):
         return "3010", ("PH",), "000"
     if action == "acknowledge_brew_complete" and (screen, flags, indicator) == ("3450", "ph", "010"):
@@ -190,7 +194,7 @@ def program_transition(action, screen, flags, indicator):
         return screen, ("ph",), "120"
     if action == "abort_program" and screen in ("2910", "2930", "2960") and (flags, indicator) == ("ph", "120"):
         return "101", ("ph",), "000"
-    if action == "acknowledge_mash_temperature" and (screen, flags, indicator) == ("2510", "Pi", "010"):
+    if action == "acknowledge_mash_temperature" and screen == "2510" and flags in {"Pi", "qi"} and indicator == "010":
         return "2610", ("ph",), "000"
     if action == "open_malt_confirmation" and (screen, flags, indicator) == ("2610", "ph", "000"):
         return "2705", ("ph",), "000"

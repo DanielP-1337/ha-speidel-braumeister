@@ -17,6 +17,8 @@ def body(state, flags="ph", indicator="000", slot="0", count="5"):
 @pytest.mark.parametrize(("action", "before", "flags", "indicator", "after", "target_flags", "target_indicator", "key"), [
     ("acknowledge_rest_end", "2910", "PH", "010", "2930", "pi", "000", 4),
     ("request_program_pause", "3010", "PH", "000", "3010", "ph", "120", 1),
+    ("request_program_pause", "3010", "qH", "0D0", "3010", "ph", "120", 1),
+    ("abort_program", "3010", "ph", "120", "101", "ph", "000", 1),
     ("resume_program", "3010", "ph", "120", "3010", "PH", "000", 4),
     ("acknowledge_brew_complete", "3450", "ph", "010", "3510", "ph", "000", 4),
     ("request_program_pause", "3450", "ph", "010", "3450", "ph", "120", 1),
@@ -41,6 +43,7 @@ def body(state, flags="ph", indicator="000", slot="0", count="5"):
     ("request_program_pause", "2310", "ph", "000", "2310", "ph", "120", 1),
     ("abort_program", "2310", "ph", "120", "101", "ph", "000", 1),
     ("acknowledge_mash_temperature", "2510", "Pi", "010", "2610", "ph", "000", 4),
+    ("acknowledge_mash_temperature", "2510", "qi", "010", "2610", "ph", "000", 4),
     ("open_malt_confirmation", "2610", "ph", "000", "2705", "ph", "000", 4),
     ("confirm_malt_added", "2705", "ph", "000", "2810", "PH", "000", 4),
     ("request_program_pause", "2810", "PH", "000", "2810", "ph", "120", 1),
@@ -110,7 +113,13 @@ async def test_exact_program_exchange_and_indicator_confirmation(
 
 @pytest.mark.parametrize(("action", "screen", "flags", "indicator"), [
     ("request_program_pause", "3010", "PH", "00T"),
-    ("request_program_pause", "3010", "qH", "0D0"),
+    ("acknowledge_mash_temperature", "2510", "qi", "000"),
+    ("acknowledge_mash_temperature", "2510", "qH", "010"),
+    ("request_program_pause", "3010", "qH", "0DT"),
+    ("request_program_pause", "3010", "PH", "0D0"),
+    ("abort_program", "3010", "qH", "0D0"),
+    ("abort_program", "3010", "PH", "120"),
+    ("abort_program", "3010", "ph", "000"),
     ("resume_program", "3010", "ph", "0D0"),
     ("acknowledge_rest_end", "2910", "PH", "120"),
     ("acknowledge_brew_complete", "3450", "ph", "120"),
